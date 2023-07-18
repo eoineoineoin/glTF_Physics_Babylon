@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "target": "ES2018",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "noResolve": false,
+        "noImplicitAny": false,
+        "sourceMap": true,
+        "declaration": true,
+        "declarationMap": true,
+        "preserveConstEnums":true,
+        "skipLibCheck": true,
+        "lib": [
+            "dom",
+            "es6"
+        ]
+    }
+}

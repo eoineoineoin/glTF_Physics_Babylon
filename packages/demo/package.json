@@ -1,0 +1,25 @@
+{
+  "name": "@babylongltfphysics/demo",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "webpack",
+    "start": "webpack serve"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@babylonjs/core": "^6.12.3",
+    "@babylonjs/havok": "^1.1.0",
+    "@babylonjs/loaders": "^6.12.3",
+    "@babylonjs/materials": "^6.12.3",
+    "@babylongltfphysics/loader": "^1.0.0",
+    "html-webpack-plugin": "^5.5.3",
+    "ts-loader": "^9.4.4",
+    "typescript": "^5.1.6",
+    "webpack": "^5.88.2",
+    "webpack-cli": "^5.1.4",
+    "webpack-dev-server": "^4.15.1"
+  }
+}
