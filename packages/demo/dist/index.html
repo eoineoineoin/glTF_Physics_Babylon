@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Hello, glTFhysics!</title>
+        <style>
+canvas {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    left: 0;
+    top: 0;
+}
+
+#sceneSelect {
+    position: absolute;
+    z-index: 1;
+    background: #ea9cfc;
+    border-radius: 12px;
+    border: 2px solid #ffffff;
+    max-width: 15em;
+}
+
+#sceneSelect ul {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+#sceneSelect li {
+    list-style: none;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+li.selectedScene {
+    background: #cc83dd;
+}
+
+span.sceneSelectTitle {
+    cursor: pointer;
+    font-size: larger;
+}
+
+a.sceneSelectLink {
+    text-decoration: none;
+}
+
+
+span.sceneSelectDescription {
+    display: block;
+    color: #605060;
+}
+
+    </style>
+    <script defer src="js/bundleName.js"></script></head>
+    <body>
+        <canvas id="sceneCanvas"></canvas>
+        <div id="sceneSelect"></div>
+    </body>
+</html>
