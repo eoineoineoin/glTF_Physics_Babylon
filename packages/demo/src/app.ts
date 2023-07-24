@@ -54,7 +54,7 @@ var sceneInfos: SceneInfo[] = [
     { 
         asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/ShapeTypes/ShapeTypes.glb",
         link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/ShapeTypes",
-        title: "Basic shapes", description: "Shows the basic primitive shapes",
+        title: "Basic shapes", description: "Shows the basic collision shapes",
     },
     { 
         asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/Filtering/Filtering.glb",
