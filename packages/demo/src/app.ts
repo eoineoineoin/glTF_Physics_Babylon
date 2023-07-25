@@ -92,6 +92,24 @@ class App {
         var canvas = <HTMLCanvasElement>document.getElementById("sceneCanvas");
         this._engine = new Engine(canvas, true);
         this.setupSceneSelection();
+
+        const sceneDropped = (_sceneFile: File, scene: Scene) => {
+            if (scene.cameras.length == 0) {
+                this.setupCamera(canvas, scene);
+            } else {
+                scene.setActiveCameraByName(scene.cameras[0].name);
+                if (scene.cameras[0] instanceof FreeCamera) {
+                    this.addCameraControls(canvas, scene.cameras[0]);
+                    scene.cameras[0].speed *= 0.1;
+                }
+            }
+
+            this.setupEnvironmentTex(scene);
+            this.setupPhysics(scene);
+        }
+
+        var filesInput = new FilesInput(this._engine, null, sceneDropped, null, null, null, null, null, null);
+        filesInput.monitorElementForDragNDrop(canvas)
     }
 
     private async loadSceneUrl(url: string) {
