@@ -77,6 +77,7 @@ class App {
 
             this.setupEnvironmentTex(scene);
             this.setupPhysics(scene);
+            this.setupShadows(scene);
         }
 
         var filesInput = new FilesInput(this._engine, null, sceneDropped, null, null, null, null, null, null);
