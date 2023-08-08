@@ -23,3 +23,14 @@ Ensure that you've called `scene.enablePhysics()` on your scene before loading a
 
 Load your glTF assets as normal!
 
+## Demo
+
+You can try out a [live demo](https://eoineoineoin.github.io/glTF_Physics_Babylon/packages/demo/dist/) with samples served from [the specification repository](https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/)
+
+Alternatively, if you want to run the demo app yourself. Clone this repo, then, in the root of this project:
+
+```
+npm install
+npm run build -w @babylongltfphysics/loader
+npm run start -w @babylongltfphysics/demo
+```

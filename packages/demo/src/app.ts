@@ -49,40 +49,6 @@ interface SceneInfo {
     link: string
 }
 
-//<todo.eoin Ideally this list should come from the samples repo itself!
-var sceneInfos: SceneInfo[] = [
-    { 
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/ShapeTypes/ShapeTypes.glb",
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/ShapeTypes",
-        title: "Basic shapes", description: "Shows the basic collision shapes",
-    },
-    { 
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/Filtering/Filtering.glb",
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/Filtering",
-        title: "Filtering", description: "Shows the effect of collision filters",
-    },
-    {
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/JointTypes/JointTypes.glb",
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/JointTypes",
-        title: "Joints", description: "Various types of joints",
-    },
-    {
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/Materials_Friction/Materials_Friction.glb",
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/Materials_Friction",
-        title: "Materials - Friction", description: "Shows effect of friction",
-    },
-    {
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/Materials_Restitution/Materials_Restitution.glb", 
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/Materials_Restitution",
-        title: "Materials - Restitution", description: "Shows effect of restitution",
-    },
-    {
-        asset: "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/MotionProperties/MotionProperties.glb",
-        link: "https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/MotionProperties",
-        title: "Motion properties", description: "How motion properties can control behaviour",
-    },
-];
-
 class App {
     private _engine: Engine;
     private _currentScene: Scene;
@@ -91,7 +57,31 @@ class App {
     constructor() {
         var canvas = <HTMLCanvasElement>document.getElementById("sceneCanvas");
         this._engine = new Engine(canvas, true);
-        this.setupSceneSelection();
+
+        fetch("https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json").then((r: Response) => {
+            r.json().then((j: SceneInfo[]) => {
+                this.setupSceneSelection(j);
+            });
+        });
+
+        const sceneDropped = (_sceneFile: File, scene: Scene) => {
+            if (scene.cameras.length == 0) {
+                this.setupCamera(canvas, scene);
+            } else {
+                scene.setActiveCameraByName(scene.cameras[0].name);
+                if (scene.cameras[0] instanceof FreeCamera) {
+                    this.addCameraControls(canvas, scene.cameras[0]);
+                    scene.cameras[0].speed *= 0.1;
+                }
+            }
+
+            this.setupEnvironmentTex(scene);
+            this.setupPhysics(scene);
+            this.setupShadows(scene);
+        }
+
+        var filesInput = new FilesInput(this._engine, null, sceneDropped, null, null, null, null, null, null);
+        filesInput.monitorElementForDragNDrop(canvas)
     }
 
     private async loadSceneUrl(url: string) {
@@ -113,9 +103,20 @@ class App {
         this.setupShadows(scene);
     }
 
-    private setupSceneSelection() {
+    private setupSceneSelection(sceneInfos: SceneInfo[]) {
         let ul = document.createElement("ul");
-        for (let si of sceneInfos) {
+        let selectedSceneIndex = 0;
+        
+        let searchStr = 'sceneIndex=';
+        let foundLoc = window.location.hash.indexOf(searchStr);
+        if (foundLoc != -1) {
+            let userIdx = window.location.hash.substring(foundLoc + searchStr.length);
+            selectedSceneIndex = +userIdx;
+        }
+
+
+        for (let i = 0; i < sceneInfos.length; i++) {
+            let si = sceneInfos[i];
             let li = document.createElement("li");
             let title = document.createElement("span");
             title.innerText = si.title;
@@ -124,9 +125,10 @@ class App {
                 this.unselectActiveScene();
                 li.setAttribute("class", "selectedScene");
                 this.loadSceneUrl(si.asset);
+                window.location.hash = '#sceneIndex=' + i;
             };
             title.onclick = loadScene;
-            if (si === sceneInfos[0]) {
+            if (i == selectedSceneIndex) {
                 loadScene();
             }
             var desc = document.createElement("span");
