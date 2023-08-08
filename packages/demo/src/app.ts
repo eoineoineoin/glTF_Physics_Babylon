@@ -105,7 +105,18 @@ class App {
 
     private setupSceneSelection(sceneInfos: SceneInfo[]) {
         let ul = document.createElement("ul");
-        for (let si of sceneInfos) {
+        let selectedSceneIndex = 0;
+        
+        let searchStr = 'sceneIndex=';
+        let foundLoc = window.location.hash.indexOf(searchStr);
+        if (foundLoc != -1) {
+            let userIdx = window.location.hash.substring(foundLoc + searchStr.length);
+            selectedSceneIndex = +userIdx;
+        }
+
+
+        for (let i = 0; i < sceneInfos.length; i++) {
+            let si = sceneInfos[i];
             let li = document.createElement("li");
             let title = document.createElement("span");
             title.innerText = si.title;
@@ -114,9 +125,10 @@ class App {
                 this.unselectActiveScene();
                 li.setAttribute("class", "selectedScene");
                 this.loadSceneUrl(si.asset);
+                window.location.hash = '#sceneIndex=' + i;
             };
             title.onclick = loadScene;
-            if (si === sceneInfos[0]) {
+            if (i == selectedSceneIndex) {
                 loadScene();
             }
             var desc = document.createElement("span");
