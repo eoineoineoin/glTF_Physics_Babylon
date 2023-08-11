@@ -2,7 +2,7 @@ import { Scene, Camera, Mesh, TransformNode, Vector3, Vector4, Matrix, Ray, Quat
 import { PhysicsEngine, PhysicsBody, PhysicsMotionType,
     PhysicsMassProperties, PhysicsRaycastResult } from "@babylonjs/core";
 import '@babylonjs/core/Physics/v2/physicsEngineComponent';
-import { HighlightLayer } from "@babylonjs/core";
+import { HighlightLayer, Color3 } from "@babylonjs/core";
 
 export class PhysicsMouseSpring
 {
@@ -45,28 +45,53 @@ export class PhysicsMouseSpring
 
                 scene.defaultCursor = "pointer";
             }
-
-            if (!this.highlight) {
-                this.highlight = new HighlightLayer("hl1", scene, {
-                    isStroke: true,
-                }); 
-            }
-            // disabled; this only works with Mesh not InstanceMesh, so is inconsistent
-            /*
-            for (let m of this.hitBody.transformNode.getChildMeshes()) {
-                if (m instanceof Mesh) {
-                    this.highlight.addMesh(m, new Color3(0.91, 0.75, 0.09));
-                }
-            }*/
         }
         else {
             this.hitBody = null;
         }
     }
 
+    public scanRay(scene: Scene, ray: Ray) {
+        if (!scene.getPhysicsEngine()) {
+            return;
+        }
+
+        let rayEnd = ray.origin.add(ray.direction.scale(Math.min(ray.length, 1e3)));
+        (scene.getPhysicsEngine() as PhysicsEngine).raycastToRef(
+            ray.origin, rayEnd, this.raycastResult);
+
+        if (this.highlight) {
+            this.highlight.removeAllMeshes();
+        }
+
+        if (this.raycastResult.hasHit) {
+            const hitMotionType = this.raycastResult.body.getMotionType(this.raycastResult.bodyIndex);
+            if (hitMotionType == PhysicsMotionType.DYNAMIC) {
+                if (!this.highlight) {
+                    this.highlight = new HighlightLayer("hl1", scene, {
+                        isStroke: true,
+                        mainTextureRatio: 1.4
+                    }); 
+                }
+
+                let scanHit = this.raycastResult.body;
+                if (scanHit.transformNode instanceof Mesh) {
+                    this.highlight.addMesh(scanHit.transformNode, new Color3(0.91, 0.75, 0.09));
+                }
+
+                for (let m of scanHit.transformNode.getChildMeshes()) {
+                    if (m instanceof Mesh) {
+                        this.highlight.addMesh(m, new Color3(0.91, 0.75, 0.09));
+                    }
+                }
+            }
+        }
+    }
+
     public release() {
         if (this.hitBody) {
             this.hitBody.transformNode.getScene().defaultCursor = "auto";
+            this.highlight.removeAllMeshes();
         }
         this.hitBody = null;
     }
@@ -74,6 +99,9 @@ export class PhysicsMouseSpring
     public stepCamera(scene : Scene, camera : Camera) {
         var ray = scene.createPickingRay(scene.pointerX, scene.pointerY, null, camera);
         this.stepRay(scene, ray);
+        if (!this.hitBody) {
+            this.scanRay(scene, ray);
+        }
     }
 
     public stepRay(scene : Scene, ray : Ray) {
