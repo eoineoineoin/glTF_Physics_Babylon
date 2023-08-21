@@ -24,7 +24,7 @@ import { Physics6DoFConstraint,
 import HavokPhysics from "@babylonjs/havok";
 import { HavokPlugin } from "@babylonjs/core";
 
-namespace MSFT_collision_primitives
+namespace KHR_collision_shapes
 {
     export class Sphere
     {
@@ -78,7 +78,7 @@ namespace MSFT_collision_primitives
         extras : {[key: string]: any} = {}
     }
 
-    export class Collider
+    export class Shape
     {
         type? : string;
         sphere? : Sphere;
@@ -91,11 +91,11 @@ namespace MSFT_collision_primitives
 
     export class SceneExt
     {
-        colliders: Array<Collider> = [];
+        shapes: Array<Shape> = [];
     }
 }
 
-namespace MSFT_rigid_bodies
+namespace KHR_rigid_bodies
 {
     export class RigidMotion
     {
@@ -147,14 +147,14 @@ namespace MSFT_rigid_bodies
 
     export class Collider
     {
-        collider? : number;
+        shape? : number;
         physicsMaterial? : number;
         collisionFilter? : number;
     }
 
     export class Trigger
     {
-        collider? : number;
+        shape? : number;
         collisionFilter? : number;
     }
 
@@ -188,14 +188,14 @@ namespace MSFT_rigid_bodies
 
 class DeferredJoint
 {
-    jointInfo? : MSFT_rigid_bodies.Joint;
+    jointInfo? : KHR_rigid_bodies.Joint;
     pivotA? : TransformNode;
     pivotB? : TransformNode;
 }
 
-export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
+export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public static s_havokInterface: any;
-    public name : string = "MSFT_rigid_bodies";
+    public name : string = "KHR_rigid_bodies";
     public enabled : boolean = true;
     private loader : GLTF2.GLTFLoader;
     private _deferredJoints : Array<DeferredJoint> = []
@@ -221,28 +221,28 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     protected async _constructPhysicsShape(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
-        colliderData: MSFT_collision_primitives.Collider,
-        filterData : Nullable<MSFT_rigid_bodies.CollisionFilter>,
-        materialData:  Nullable<MSFT_rigid_bodies.PhysicsMaterial>,
+        shapeData: KHR_collision_shapes.Shape,
+        filterData : Nullable<KHR_rigid_bodies.CollisionFilter>,
+        materialData:  Nullable<KHR_rigid_bodies.PhysicsMaterial>,
         assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
         let scene = this.loader.babylonScene;
         let physicsShape: Nullable<PhysicsShape> = null;
-        if (colliderData.sphere != undefined) {
-            var sphere = new PhysicsShapeSphere(Vector3.Zero(), colliderData.sphere.radius, scene);
+        if (shapeData.sphere != undefined) {
+            var sphere = new PhysicsShapeSphere(Vector3.Zero(), shapeData.sphere.radius, scene);
             physicsShape = sphere;
         }
-        else if (colliderData.box != undefined) {
-            const size = Vector3.FromArray(colliderData.box.size);
+        else if (shapeData.box != undefined) {
+            const size = Vector3.FromArray(shapeData.box.size);
             var box = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), size, scene);
             physicsShape = box;
         }
-        else if (colliderData.cylinder != undefined) {
-            const pointA = new Vector3(0, 0.5 * colliderData.cylinder.height, 0);
-            const pointB = new Vector3(0, 0.5 * -colliderData.cylinder.height, 0);
+        else if (shapeData.cylinder != undefined) {
+            const pointA = new Vector3(0, 0.5 * shapeData.cylinder.height, 0);
+            const pointB = new Vector3(0, 0.5 * -shapeData.cylinder.height, 0);
 
-            if (colliderData.cylinder.radiusTop == colliderData.cylinder.radiusBottom) {
-                var cylinder = new PhysicsShapeCylinder(pointA, pointB, colliderData.cylinder.radiusTop, scene);
+            if (shapeData.cylinder.radiusTop == shapeData.cylinder.radiusBottom) {
+                var cylinder = new PhysicsShapeCylinder(pointA, pointB, shapeData.cylinder.radiusTop, scene);
                 physicsShape = cylinder;
             } else {
                 //<todo We're approximating this with a convex hull - should get the physics engine
@@ -254,13 +254,13 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 for(let i = 0; i < numDivisions; i++) {
                     const c = Math.cos(2 * Math.PI * i / (numDivisions - 1));
                     const s = Math.sin(2 * Math.PI * i / (numDivisions - 1));
-                    positions.push(c * colliderData.cylinder.radiusTop);
-                    positions.push(0.5 * colliderData.cylinder.height);
-                    positions.push(s * colliderData.cylinder.radiusTop);
+                    positions.push(c * shapeData.cylinder.radiusTop);
+                    positions.push(0.5 * shapeData.cylinder.height);
+                    positions.push(s * shapeData.cylinder.radiusTop);
 
-                    positions.push(c * colliderData.cylinder.radiusBottom);
-                    positions.push(-0.5 * colliderData.cylinder.height);
-                    positions.push(s * colliderData.cylinder.radiusBottom);
+                    positions.push(c * shapeData.cylinder.radiusBottom);
+                    positions.push(-0.5 * shapeData.cylinder.height);
+                    positions.push(s * shapeData.cylinder.radiusBottom);
                 }
                 var vertexData = new VertexData();
                 vertexData.positions = positions;
@@ -268,8 +268,8 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 physicsShape = new PhysicsShapeConvexHull(cylinderMesh, scene);
             }
         }
-        else if (colliderData.capsule != undefined) {
-            const capsuleData = colliderData.capsule;
+        else if (shapeData.capsule != undefined) {
+            const capsuleData = shapeData.capsule;
             const pointA = new Vector3(0, 0.5 * capsuleData.height, 0);
             const pointB = new Vector3(0, -0.5 * capsuleData.height, 0);
 
@@ -286,8 +286,8 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 templateMesh.dispose();
             }
         }
-        else if (colliderData.convex != undefined) {
-            var meshData = this.loader.gltf.meshes![colliderData.convex.mesh];
+        else if (shapeData.convex != undefined) {
+            var meshData = this.loader.gltf.meshes![shapeData.convex.mesh];
             //<todo I just want to access the mesh object here; not create one in the scene
             //@ts-ignore _loadMeshAsync is private:
             var convexMesh = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
@@ -299,8 +299,8 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
             physicsShape = new PhysicsShape({ type: PhysicsShapeType.CONVEX_HULL, parameters: { mesh: convexMesh, includeChildMeshes: true }}, scene);
             convexMesh.dispose();
         }
-        else if (colliderData.trimesh != undefined) {
-            var meshData = this.loader.gltf.meshes![colliderData.trimesh.mesh];
+        else if (shapeData.trimesh != undefined) {
+            var meshData = this.loader.gltf.meshes![shapeData.trimesh.mesh];
             //@ts-ignore _loadMeshAsync is private:
             var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
             meshShape.parent = null;
@@ -385,15 +385,15 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructNodeObjects(
         context : string, sceneNode : AbstractMesh, gltfNode : GLTF2.INode,
         assign : ((babylonMesh: TransformNode) => void)) {
-        var extData = gltfNode.extensions!.MSFT_rigid_bodies as MSFT_rigid_bodies.NodeExt;
+        var extData = gltfNode.extensions!.KHR_rigid_bodies as KHR_rigid_bodies.NodeExt;
 
         if (extData.collider != null) //<todo Also handle triggers, once exposed
         {
-            let ext : MSFT_collision_primitives.SceneExt = this.loader.gltf.extensions!.MSFT_collision_primitives;
-            var rbExt : MSFT_rigid_bodies.SceneExt = this.loader.gltf.extensions!.MSFT_rigid_bodies;
-            let collider : MSFT_collision_primitives.Collider = ext.colliders[extData.collider.collider!];
-            let filter : Nullable<MSFT_rigid_bodies.CollisionFilter> = null;
-            let material : Nullable<MSFT_rigid_bodies.PhysicsMaterial> = null;
+            let ext : KHR_collision_shapes.SceneExt = this.loader.gltf.extensions!.KHR_collision_shapes;
+            var rbExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+            let collider : KHR_collision_shapes.Shape = ext.shapes[extData.collider.shape!];
+            let filter : Nullable<KHR_rigid_bodies.CollisionFilter> = null;
+            let material : Nullable<KHR_rigid_bodies.PhysicsMaterial> = null;
             if (extData.collider.collisionFilter != null) {
                 filter = rbExt.collisionFilters![extData.collider.collisionFilter];
             }
@@ -509,7 +509,7 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public async loadNodeAsync(context : string, node : GLTF2.INode, assign : ((babylonMesh: TransformNode) => void))
     {
         if (node.extensions != undefined &&
-            node.extensions.MSFT_rigid_bodies != undefined &&
+            node.extensions.KHR_rigid_bodies != undefined &&
             this._physicsVersion == 2)
         {
             //<todo Can this really ever return a transform node? Will need to handle
@@ -525,7 +525,7 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public async loadSceneAsync(context : string, scene : GLTF2.IScene) : Promise<void> {
         if (!this._babylonScene.getPhysicsEngine()) {
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
-            const hkPlugin = new HavokPlugin(true, MSFT_RigidBodies_Plugin.s_havokInterface);
+            const hkPlugin = new HavokPlugin(true, KHR_RigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine!.getPluginVersion();
@@ -578,7 +578,7 @@ export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         pivotBToBodyB.decompose(undefined, pivotOrientationInB);
         var pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB).multiply(rbBScale);
 
-        var sceneExt : MSFT_rigid_bodies.SceneExt = this.loader.gltf.extensions!.MSFT_rigid_bodies;
+        var sceneExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
 
         var limitSet = sceneExt.physicsJointLimits![joint.jointInfo!.jointLimits].limits;
         const nativeLimits: Physics6DoFLimit[] = []

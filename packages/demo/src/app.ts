@@ -12,12 +12,12 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { MSFT_RigidBodies_Plugin } from "@babylongltfphysics/loader";
+import { KHR_RigidBodies_Plugin } from "@babylongltfphysics/loader";
 
 const g_havokInterface = await HavokPhysics();
-MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
+KHR_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
 GLTF2.GLTFLoader.RegisterExtension(
-   "MSFT_rigid_bodies", function (loader) { return new MSFT_RigidBodies_Plugin(loader); } );
+   "KHR_rigid_bodies", function (loader) { return new KHR_RigidBodies_Plugin(loader); } );
 
 import { PhysicsMouseSpring } from './physicsUtils';
 import { CubeTexture } from "@babylonjs/core";
@@ -59,7 +59,9 @@ class App {
         this._engine = new Engine(canvas, true);
         this.setupEmptyScene();
 
-        fetch("https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json").then((r: Response) => {
+        //const assetListUrl = "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json";
+        const assetListUrl = "http://localhost:8000/samplelist.json";
+        fetch(assetListUrl).then((r: Response) => {
             r.json().then((j: SceneInfo[]) => {
                 this.setupSceneSelection(j);
             });
