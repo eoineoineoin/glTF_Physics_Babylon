@@ -59,8 +59,7 @@ class App {
         this._engine = new Engine(canvas, true);
         this.setupEmptyScene();
 
-        //const assetListUrl = "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json";
-        const assetListUrl = "http://localhost:8000/samplelist.json";
+        const assetListUrl = "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json";
         fetch(assetListUrl).then((r: Response) => {
             r.json().then((j: SceneInfo[]) => {
                 this.setupSceneSelection(j);
