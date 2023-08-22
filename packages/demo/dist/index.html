@@ -12,7 +12,7 @@ canvas {
     top: 0;
 }
 
-#sceneSelect {
+#demoControls {
     position: absolute;
     z-index: 1;
     background: #ea9cfc;
@@ -21,23 +21,28 @@ canvas {
     max-width: 15em;
 }
 
-#sceneSelect ul {
+#demoControls ul {
     padding-left: 0;
     padding-right: 0;
 }
 
-#sceneSelect li {
+#demoControls li {
     list-style: none;
     padding-left: 12px;
     padding-right: 12px;
 }
 
+li.selectedCamera,
 li.selectedScene {
     background: #cc83dd;
 }
 
-span.sceneSelectTitle {
+span.selectableItem {
     cursor: pointer;
+}
+
+#sceneSelect li span.selectableItem
+{
     font-size: larger;
 }
 
@@ -55,6 +60,10 @@ span.sceneSelectDescription {
     <script defer src="js/bundleName.js"></script></head>
     <body>
         <canvas id="sceneCanvas"></canvas>
-        <div id="sceneSelect"></div>
+        <div id="demoControls">
+            <div id="sceneSelect"></div>
+            <div id="cameraSelect"></div>
+        </div>
+
     </body>
 </html>
