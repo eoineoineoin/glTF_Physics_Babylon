@@ -1,4 +1,4 @@
-import { Scene, Camera, Mesh, TransformNode, Vector3, Matrix, Ray} from "@babylonjs/core";
+import { Scene, Camera, Mesh, TransformNode, Vector3, Vector4, Matrix, Ray, Quaternion} from "@babylonjs/core";
 import { PhysicsEngine, PhysicsBody, PhysicsMotionType,
     PhysicsMassProperties, PhysicsRaycastResult } from "@babylonjs/core";
 import '@babylonjs/core/Physics/v2/physicsEngineComponent';
@@ -45,28 +45,53 @@ export class PhysicsMouseSpring
 
                 scene.defaultCursor = "pointer";
             }
-
-            if (!this.highlight) {
-                this.highlight = new HighlightLayer("hl1", scene, {
-                    isStroke: true,
-                }); 
-            }
-            // disabled; this only works with Mesh not InstanceMesh, so is inconsistent
-            /*
-            for (let m of this.hitBody.transformNode.getChildMeshes()) {
-                if (m instanceof Mesh) {
-                    this.highlight.addMesh(m, new Color3(0.91, 0.75, 0.09));
-                }
-            }*/
         }
         else {
             this.hitBody = null;
         }
     }
 
+    public scanRay(scene: Scene, ray: Ray) {
+        if (!scene.getPhysicsEngine()) {
+            return;
+        }
+
+        let rayEnd = ray.origin.add(ray.direction.scale(Math.min(ray.length, 1e3)));
+        (scene.getPhysicsEngine() as PhysicsEngine).raycastToRef(
+            ray.origin, rayEnd, this.raycastResult);
+
+        if (this.highlight) {
+            this.highlight.removeAllMeshes();
+        }
+
+        if (this.raycastResult.hasHit) {
+            const hitMotionType = this.raycastResult.body.getMotionType(this.raycastResult.bodyIndex);
+            if (hitMotionType == PhysicsMotionType.DYNAMIC) {
+                if (!this.highlight) {
+                    this.highlight = new HighlightLayer("hl1", scene, {
+                        isStroke: true,
+                        mainTextureRatio: 1.4
+                    }); 
+                }
+
+                let scanHit = this.raycastResult.body;
+                if (scanHit.transformNode instanceof Mesh) {
+                    this.highlight.addMesh(scanHit.transformNode, new Color3(0.91, 0.75, 0.09));
+                }
+
+                for (let m of scanHit.transformNode.getChildMeshes()) {
+                    if (m instanceof Mesh) {
+                        this.highlight.addMesh(m, new Color3(0.91, 0.75, 0.09));
+                    }
+                }
+            }
+        }
+    }
+
     public release() {
         if (this.hitBody) {
             this.hitBody.transformNode.getScene().defaultCursor = "auto";
+            this.highlight.removeAllMeshes();
         }
         this.hitBody = null;
     }
@@ -74,6 +99,9 @@ export class PhysicsMouseSpring
     public stepCamera(scene : Scene, camera : Camera) {
         var ray = scene.createPickingRay(scene.pointerX, scene.pointerY, null, camera);
         this.stepRay(scene, ray);
+        if (!this.hitBody) {
+            this.scanRay(scene, ray);
+        }
     }
 
     public stepRay(scene : Scene, ray : Ray) {
@@ -90,22 +118,22 @@ export class PhysicsMouseSpring
         var forceDir = desiredPickEnd.subtract(currentPickEnd);
 
         if (this.hitBody!= null) {
-            const dt = scene.deltaTime;
-            const invdt = 1 / dt;
-            const stiffness = 1.0;
-            const damping = 1.0;
+            const dt = scene.deltaTime / 1000.0; // Scene.deltaTime is in milliseconds
+            const invdt = 1.0 / dt;
+            const stiffness = 0.1;
+            const damping = 0.5;
+            const bodyDamping = 3;
 
             // Damp current velocity
             {
-                const linearVelocityGain = 0.4;
-                const angularVelocityGain = 0.4;
+                const gain = 1 - bodyDamping * dt;
                 let lv = new Vector3();
                 this.hitBody.getLinearVelocityToRef(lv, this.hitInstanceIndex);
                 let av = new Vector3();
                 this.hitBody.getAngularVelocityToRef(av, this.hitInstanceIndex);
 
-                this.hitBody.setLinearVelocity(lv.scale(linearVelocityGain), this.hitInstanceIndex);
-                this.hitBody.setAngularVelocity(av.scale(angularVelocityGain), this.hitInstanceIndex);
+                this.hitBody.setLinearVelocity(lv.scale(gain), this.hitInstanceIndex);
+                this.hitBody.setAngularVelocity(av.scale(gain), this.hitInstanceIndex);
             }
 
             let mp = this.hitBody.getMassProperties(this.hitInstanceIndex);
@@ -125,11 +153,16 @@ export class PhysicsMouseSpring
             let delta = forceDir.scale(stiffness * invdt);
             delta = delta.subtract(pointVel.scale(damping));
 
-            let force = forceDir.scale(this.springConstant * mp.mass);
-            this.hitBody.applyForce(force, currentPickEnd, this.hitInstanceIndex);
             let effMass = this._buildMassMatrixAt(
                 currentPickEnd, comWorld, this.hitBody.transformNode, mp);
             let impulse = Vector3.TransformNormal(delta, effMass);
+            if (mp.mass > 0) {
+                const maxAccel = 250;
+                let maxImpulse = mp.mass * dt * maxAccel;
+                if (impulse.lengthSquared() > maxImpulse * maxImpulse) {
+                    impulse.scaleInPlace(maxImpulse / impulse.length());
+                }
+            }
             this.hitBody.applyImpulse(impulse, currentPickEnd, this.hitInstanceIndex);
         }
     }
@@ -170,9 +203,10 @@ export class PhysicsMouseSpring
 
     protected _subtract(m1: Matrix, m2:Matrix): Matrix {
         let ret = new Matrix();
-        for(let i = 0; i < 16; i++) {
-            ret[i] = m1[i] - m2[i];
+        for (let i = 0; i < 3; i++) {
+            ret.setRow(i, m1.getRow(i).subtract(m2.getRow(i)));
         }
+        ret.setRowFromFloats(3, 0, 0, 0, 1);
         return ret;
     }
 
@@ -186,24 +220,30 @@ export class PhysicsMouseSpring
     }
 
     protected _getInvInertiaWorld(tn: TransformNode, mp: PhysicsMassProperties): Matrix {
+        const rotationQ = mp.inertiaOrientation.multiply(tn.rotationQuaternion);
+        let rotation = new Matrix();
+        Matrix.FromQuaternionToRef(rotationQ, rotation);
+
         const mass = mp.mass == 0 ? 1 : mp.mass;
         const inv_ix = mp.inertia.x == 0 ? 0 : 1.0 / (mp.inertia.x * mass);
         const inv_iy = mp.inertia.y == 0 ? 0 : 1.0 / (mp.inertia.y * mass);
         const inv_iz = mp.inertia.z == 0 ? 0 : 1.0 / (mp.inertia.z * mass);
-        const invInertia = new Vector3(inv_ix, inv_iy, inv_iz);
-        const inm = this._diagMat(invInertia);
+        const invInertiaLocal = new Vector4(inv_ix, inv_iy, inv_iz, 1);
 
-        const rotation = tn.absoluteRotationQuaternion.multiply(mp.inertiaOrientation);
-        let rotationM = new Matrix();
-        Matrix.FromQuaternionToRef(rotation, rotationM);
-        return inm.multiply(Matrix.Invert(rotationM));
+        let inm = new Matrix();
+        inm.setRow(0, invInertiaLocal.multiply(rotation.getRow(0)));
+        inm.setRow(1, invInertiaLocal.multiply(rotation.getRow(1)));
+        inm.setRow(2, invInertiaLocal.multiply(rotation.getRow(2)));
+        inm.setRow(3, invInertiaLocal.multiply(rotation.getRow(3)));
+
+        return inm.multiply(Matrix.Invert(rotation));
     }
 
     protected _crossSkewSymmetricMat(r: Vector3): Matrix {
         let m = Matrix.Zero();
-        m.setRowFromFloats(0, 0.0, r.z, -r.y, 0);
-        m.setRowFromFloats(1, -r.z, 0, r.x, 0);
-        m.setRowFromFloats(2, r.y, -r.x, 0, 0);
+        m.setRowFromFloats(0, 0, -r.z, r.y, 0);
+        m.setRowFromFloats(1, r.z, 0, -r.x, 0);
+        m.setRowFromFloats(2, -r.y, r.x, 0, 0);
         m.setRowFromFloats(3, 0, 0, 0, 1);
         return m;
     }

@@ -12,12 +12,12 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { MSFT_RigidBodies_Plugin } from "@babylongltfphysics/loader";
+import { KHR_RigidBodies_Plugin } from "@babylongltfphysics/loader";
 
 const g_havokInterface = await HavokPhysics();
-MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
+KHR_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
 GLTF2.GLTFLoader.RegisterExtension(
-   "MSFT_rigid_bodies", function (loader) { return new MSFT_RigidBodies_Plugin(loader); } );
+   "KHR_rigid_bodies", function (loader) { return new KHR_RigidBodies_Plugin(loader); } );
 
 import { PhysicsMouseSpring } from './physicsUtils';
 import { CubeTexture } from "@babylonjs/core";
@@ -51,33 +51,38 @@ interface SceneInfo {
 
 class App {
     private _engine: Engine;
-    private _currentScene: Scene;
     private _hkPlugin: HavokPluginWithPausing;
+    private _defaultCamera: FreeCamera;
 
     constructor() {
         var canvas = <HTMLCanvasElement>document.getElementById("sceneCanvas");
         this._engine = new Engine(canvas, true);
+        this.setupEmptyScene();
 
-        fetch("https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json").then((r: Response) => {
+        const assetListUrl = "https://raw.githubusercontent.com/eoineoineoin/glTF_Physics/master/samples/samplelist.json";
+        fetch(assetListUrl).then((r: Response) => {
             r.json().then((j: SceneInfo[]) => {
                 this.setupSceneSelection(j);
             });
         });
 
         const sceneDropped = (_sceneFile: File, scene: Scene) => {
+            /*
             if (scene.cameras.length == 0) {
-                this.setupCamera(canvas, scene);
+                this.setupCamera(scene);
             } else {
                 scene.setActiveCameraByName(scene.cameras[0].name);
                 if (scene.cameras[0] instanceof FreeCamera) {
                     this.addCameraControls(canvas, scene.cameras[0]);
-                    scene.cameras[0].speed *= 0.1;
                 }
             }
+            */
 
             this.setupEnvironmentTex(scene);
             this.setupPhysics(scene);
             this.setupShadows(scene);
+            this.createDefaultCamera(scene);
+            this.setupCameraSelection(scene);
         }
 
         var filesInput = new FilesInput(this._engine, null, sceneDropped, null, null, null, null, null, null);
@@ -85,21 +90,11 @@ class App {
     }
 
     private async loadSceneUrl(url: string) {
-        if (this._currentScene) {
-            this._currentScene.dispose();
-        }
-
         let scene = this.setupEmptyScene();
         await this.setupPhysics(scene);
         await SceneLoader.ImportMeshAsync("", url, "", scene);
 
-        if (scene.cameras.length > 1) {
-            // If the scene we loaded has added a camera, let's use it
-            scene.activeCamera = scene.cameras[1];
-            var canvas = <HTMLCanvasElement>document.getElementById("sceneCanvas");
-            this.addCameraControls(canvas, <FreeCamera>scene.cameras[1]);
-        }
-
+        this.setupCameraSelection(scene);
         this.setupShadows(scene);
     }
 
@@ -114,15 +109,18 @@ class App {
             selectedSceneIndex = +userIdx;
         }
 
-
         for (let i = 0; i < sceneInfos.length; i++) {
             let si = sceneInfos[i];
             let li = document.createElement("li");
             let title = document.createElement("span");
             title.innerText = si.title;
-            title.setAttribute("class", "sceneSelectTitle");
+            title.setAttribute("class", "selectableItem");
             let loadScene = () => {
-                this.unselectActiveScene();
+                let activeEntries = document.getElementsByClassName("selectedScene");
+                for (let i = 0; i < activeEntries.length; i++) {
+                    activeEntries[i].removeAttribute("class");
+                }
+
                 li.setAttribute("class", "selectedScene");
                 this.loadSceneUrl(si.asset);
                 window.location.hash = '#sceneIndex=' + i;
@@ -149,6 +147,48 @@ class App {
         document.getElementById("sceneSelect").appendChild(ul);
     }
 
+    private setupCameraSelection(scene: Scene) {
+        if (scene.cameras.length > 1) {
+            // If the scene contained any cameras, let's default to that one
+            scene.activeCamera = scene.cameras[0] == this._defaultCamera ? scene.cameras[1] : scene.cameras[0];
+        } else {
+            scene.activeCamera = scene.cameras[0];
+        }
+
+        let camList = document.createElement("ul");
+        for (let cam of scene.cameras) {
+            this.addCameraKeyboardControl(<FreeCamera>cam);
+            if (cam != this._defaultCamera) {
+                (<FreeCamera>cam).speed *= 0.1; // Default is too fast for my liking
+            }
+
+            let li = document.createElement("li");
+            let title = document.createElement("span");
+            title.innerText = "🎥 " + cam.name;
+            title.setAttribute("class", "selectableItem");
+            let changeCamera = () => {
+                scene.activeCamera.detachControl();
+                let activeEntries = document.getElementsByClassName("selectedCamera");
+                for (let i = 0; i < activeEntries.length; i++) {
+                    activeEntries[i].removeAttribute("class");
+                }
+                scene.activeCamera = cam;
+                li.setAttribute("class", "selectedCamera");
+                scene.activeCamera.attachControl(undefined, true);
+            };
+            title.onclick = changeCamera;
+            li.appendChild(title);
+            camList.appendChild(li);
+            if (cam == scene.activeCamera) {
+                li.setAttribute("class", "selectedCamera");
+            }
+        }
+
+        let cameraSelect = document.getElementById("cameraSelect");
+        cameraSelect.replaceChildren(camList);
+        scene.activeCamera.attachControl(undefined, true);
+    }
+
     private setupEmptyScene() {
         var scene = new Scene(this._engine);
         window.addEventListener("resize", () => { this._engine.resize(); });
@@ -156,10 +196,8 @@ class App {
             scene.render();
         });
 
-        var canvas = <HTMLCanvasElement>document.getElementById("sceneCanvas");
-        this.setupCamera(canvas, scene);
+        this.createDefaultCamera(scene);
         this.setupEnvironmentTex(scene);
-        this._currentScene = scene;
         return scene;
     }
 
@@ -169,17 +207,17 @@ class App {
         scene.createDefaultSkybox(scene.environmentTexture, true, 1000, 0.2, false);
     }
 
-    private setupCamera(canvas: HTMLCanvasElement, scene: Scene) {
-        let camera = new FreeCamera("hkCamera", new Vector3(0.1, 1.8, 1.3), scene);
+    private createDefaultCamera(scene: Scene): FreeCamera {
+        let camera = new FreeCamera("Default Camera", new Vector3(0.1, 1.8, 1.3), scene);
         camera.speed *= 0.1;
         camera.setTarget(new Vector3(-0.2, 0.8, -0.3));
         camera.minZ = 0.01;
         camera.maxZ = 100;
-        this.addCameraControls(canvas, camera);
+        this._defaultCamera = camera;
+        return camera;
     }
 
-    private addCameraControls(canvas: HTMLCanvasElement, camera: FreeCamera) {
-        camera.attachControl(canvas, true);
+    private addCameraKeyboardControl(camera: FreeCamera) {
         camera.keysUp.push(87);
         camera.keysDown.push(83);
         camera.keysLeft.push(65);
@@ -245,13 +283,6 @@ class App {
         scene.getEngine().runRenderLoop(() => {
             mouseSpringUtil.stepCamera(scene, scene.activeCamera);
         });
-    }
-
-    private unselectActiveScene() {
-        let activeEntries = document.getElementsByClassName("selectedScene");
-        for (let i = 0; i < activeEntries.length; i++) {
-            activeEntries[i].removeAttribute("class");
-        }
     }
 }
 
