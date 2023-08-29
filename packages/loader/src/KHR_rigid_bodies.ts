@@ -591,30 +591,28 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 //< Should expose these and be more explicit about creating them
                 else {
                     for (const axIdx of l.linearAxes) {
-                        if (axIdx == 0) {
-                            nativeLimits.push({axis: PhysicsConstraintAxis.LINEAR_X, minLimit: l.min, maxLimit: l.max});
-                        }
-                        if (axIdx == 1) {
-                            nativeLimits.push({axis: PhysicsConstraintAxis.LINEAR_Y, minLimit: l.min, maxLimit: l.max});
-                        }
-                        if (axIdx == 2) {
-                            nativeLimits.push({axis: PhysicsConstraintAxis.LINEAR_Z, minLimit: l.min, maxLimit: l.max});
-                        }
+                        let axisNative = this._linearIdxToNative(axIdx);
+                        nativeLimits.push({
+                            axis: axisNative,
+                            minLimit: l.min,
+                            maxLimit: l.max,
+                            stiffness: l.springConstant,
+                            damping: l.springDamping
+                        });
                       }
                 }
             } else if (l.angularAxes) {
                 //<todo Interface doesn't expose explicit 2D limits - they're inferred automatically.
                 //< Should expose these and be more explicit about creating them
                 for (const axIdx of l.angularAxes) {
-                    if (axIdx == 0) {
-                        nativeLimits.push({axis: PhysicsConstraintAxis.ANGULAR_X, minLimit: l.min, maxLimit: l.max});
-                    }
-                    if (axIdx == 1) {
-                        nativeLimits.push({axis: PhysicsConstraintAxis.ANGULAR_Y, minLimit: l.min, maxLimit: l.max});
-                    }
-                    if (axIdx == 2) {
-                        nativeLimits.push({axis: PhysicsConstraintAxis.ANGULAR_Z, minLimit: l.min, maxLimit: l.max});
-                    }
+                    let axisNative = this._angularIdxToNative(axIdx);
+                    nativeLimits.push({
+                        axis: axisNative,
+                        minLimit: l.min,
+                        maxLimit: l.max,
+                        stiffness: l.springConstant,
+                        damping: l.springDamping
+                    });
                 }
             }
         }
@@ -631,6 +629,22 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         //<todo addConstraint() should allow for a null body
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
+    }
+
+    protected _linearIdxToNative(idx: number) : PhysicsConstraintAxis
+    {
+        if (idx == 0) return PhysicsConstraintAxis.LINEAR_X;
+        if (idx == 1) return PhysicsConstraintAxis.LINEAR_Y;
+        if (idx == 2) return PhysicsConstraintAxis.LINEAR_Z;
+        throw new RangeError("Axis index out of range");
+    }
+
+    protected _angularIdxToNative(idx: number) : PhysicsConstraintAxis
+    {
+        if (idx == 0) return PhysicsConstraintAxis.ANGULAR_X;
+        if (idx == 1) return PhysicsConstraintAxis.ANGULAR_Y;
+        if (idx == 2) return PhysicsConstraintAxis.ANGULAR_Z;
+        throw new RangeError("Axis index out of range");
     }
 
     protected _getParentRigidBody(node : TransformNode | null) : Nullable<TransformNode>
