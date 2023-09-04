@@ -1,7 +1,7 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { IGLTFLoaderExtension } from "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders/glTF";
-import { AbstractMesh, Mesh, VertexData, MeshBuilder } from "@babylonjs/core";
+import { AbstractMesh, Mesh, VertexData, MeshBuilder, PhysicsConstraintMotorType } from "@babylonjs/core";
 import { Nullable } from "@babylonjs/core";
 import { Scene, Matrix, Quaternion, Vector3 } from "@babylonjs/core";
 
@@ -119,6 +119,15 @@ namespace KHR_rigid_bodies
         notCollideWithSystems? : Array<string>;
     }
 
+    export class ConstraintDrive
+    {
+        positionTarget: number = 0;
+        velocityTarget: number = 0;
+        maxForce?: number;
+        damping: number = 0;
+        stiffness: number = 0;
+    }
+
     export class Constraint
     {
         min? : number;
@@ -128,6 +137,8 @@ namespace KHR_rigid_bodies
 
         linearAxes? : Array<number>;
         angularAxes? : Array<number>;
+
+        drive? : ConstraintDrive
 
         extensions : {[key: string]: any} = {}
         extras : {[key: string]: any} = {}
@@ -582,6 +593,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
         var limitSet = sceneExt.physicsJointLimits![joint.jointInfo!.jointLimits].limits;
         const nativeLimits: Physics6DoFLimit[] = []
+        let motors: {axis: PhysicsConstraintAxis, drive: KHR_rigid_bodies.ConstraintDrive}[] = [];
         for (const l of limitSet) {
             if (l.linearAxes) {
                 if (l.linearAxes.length == 3) {
@@ -599,7 +611,11 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                             stiffness: l.springConstant,
                             damping: l.springDamping
                         });
-                      }
+
+                        if (l.drive) {
+                            motors.push({ axis: axisNative, drive: l.drive });
+                        }
+                    }
                 }
             } else if (l.angularAxes) {
                 //<todo Interface doesn't expose explicit 2D limits - they're inferred automatically.
@@ -613,6 +629,10 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                         stiffness: l.springConstant,
                         damping: l.springDamping
                     });
+
+                    if (l.drive) {
+                        motors.push({ axis: axisNative, drive: l.drive });
+                    }
                 }
             }
         }
@@ -629,6 +649,27 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         //<todo addConstraint() should allow for a null body
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
+
+        for (let m of motors) {
+            if (m.drive.velocityTarget != undefined) {
+                constraintInstance.setAxisMotorType(m.axis, PhysicsConstraintMotorType.VELOCITY);
+                constraintInstance.setAxisMotorTarget(m.axis, m.drive.velocityTarget);
+                if (m.drive.maxForce) {
+                    constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
+                } else {
+                    constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
+                }
+            }
+            if (m.drive.positionTarget != undefined) {
+                constraintInstance.setAxisMotorType(m.axis, PhysicsConstraintMotorType.POSITION);
+                constraintInstance.setAxisMotorTarget(m.axis, m.drive.positionTarget);
+                if (m.drive.maxForce) {
+                    constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
+                } else {
+                    constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
+                }
+            }
+        }
     }
 
     protected _linearIdxToNative(idx: number) : PhysicsConstraintAxis
