@@ -13,11 +13,15 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
 import { KHR_RigidBodies_Plugin } from "@babylongltfphysics/loader";
+import { MSFT_RigidBodies_Plugin } from "@babylongltfphysics/loader";
 
 const g_havokInterface = await HavokPhysics();
 KHR_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
 GLTF2.GLTFLoader.RegisterExtension(
    "KHR_rigid_bodies", function (loader) { return new KHR_RigidBodies_Plugin(loader); } );
+MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
+GLTF2.GLTFLoader.RegisterExtension(
+   "MSFT_rigid_bodies", function (loader) { return new MSFT_RigidBodies_Plugin(loader); } );
 
 import { PhysicsMouseSpring } from './physicsUtils';
 import { CubeTexture } from "@babylonjs/core";
