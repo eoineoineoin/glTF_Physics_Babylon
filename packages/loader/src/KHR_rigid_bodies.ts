@@ -650,24 +650,29 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
 
+        let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
+        let wasm = hp._hknp;
         for (let m of motors) {
+            //@ts-ignore
+            let hpAxis = hp._constraintAxisToNative(m.axis);
+            wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING_MI);
+
             if (m.drive.velocityTarget != undefined) {
-                constraintInstance.setAxisMotorType(m.axis, PhysicsConstraintMotorType.VELOCITY);
-                constraintInstance.setAxisMotorTarget(m.axis, m.drive.velocityTarget);
-                if (m.drive.maxForce) {
-                    constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
-                } else {
-                    constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
-                }
+                wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData, hpAxis, m.drive.velocityTarget);
             }
+
             if (m.drive.positionTarget != undefined) {
-                constraintInstance.setAxisMotorType(m.axis, PhysicsConstraintMotorType.POSITION);
-                constraintInstance.setAxisMotorTarget(m.axis, m.drive.positionTarget);
-                if (m.drive.maxForce) {
-                    constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
-                } else {
-                    constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
-                }
+                wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData, hpAxis, m.drive.positionTarget);
+
+            }
+
+            wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData, hpAxis, m.drive.stiffness ?? 0);
+            wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData, hpAxis, m.drive.damping ?? 0);
+
+            if (m.drive.maxForce) {
+                constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
+            } else {
+                constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
             }
         }
     }
