@@ -1,28 +1,32 @@
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 import { IGLTFLoaderExtension } from "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders/glTF";
-import { AbstractMesh, Mesh, VertexData, MeshBuilder } from "@babylonjs/core";
-import { Nullable } from "@babylonjs/core";
-import { Scene, Matrix, Quaternion, Vector3 } from "@babylonjs/core";
+import { AbstractMesh } from "@babylonjs/core/Meshes/abstractMesh";
+import { Mesh } from "@babylonjs/core/Meshes/mesh";
+import { VertexData } from "@babylonjs/core/Meshes/mesh.vertexData";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { Nullable } from "@babylonjs/core/types";
+import { Scene } from "@babylonjs/core/scene";
+import "@babylonjs/core/Physics/joinedPhysicsEngineComponent";
+import { Matrix, Quaternion, Vector3 } from "@babylonjs/core/Maths/math.vector";
 
+import { PhysicsShapeType,
+    PhysicsConstraintAxis,
+    PhysicsMassProperties,
+    PhysicsMotionType } from "@babylonjs/core/Physics/v2/IPhysicsEnginePlugin";
 import { PhysicsShape,
     PhysicsShapeBox,
     PhysicsShapeCapsule,
     PhysicsShapeContainer,
     PhysicsShapeConvexHull,
     PhysicsShapeCylinder,
-    PhysicsShapeSphere } from "@babylonjs/core";
-import { PhysicsShapeType,
-    PhysicsConstraintAxis,
-    PhysicsMassProperties,
-    PhysicsMotionType } from "@babylonjs/core";
-import { PhysicsMaterialCombineMode } from "@babylonjs/core";
-import { PhysicsBody } from "@babylonjs/core";
+    PhysicsShapeSphere } from "@babylonjs/core/Physics/v2/physicsShape";
+import { PhysicsMaterialCombineMode } from "@babylonjs/core/Physics/v2/physicsMaterial";
+import { PhysicsBody } from "@babylonjs/core/Physics/v2/physicsBody";
+import "@babylonjs/core/Physics/v2/physicsEngineComponent";
 import { Physics6DoFConstraint,
-    Physics6DoFLimit } from "@babylonjs/core";
-
-import HavokPhysics from "@babylonjs/havok";
-import { HavokPlugin } from "@babylonjs/core";
+    Physics6DoFLimit } from "@babylonjs/core/Physics/v2/physicsConstraint";
+import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
 namespace KHR_collision_shapes
 {
@@ -194,8 +198,16 @@ class DeferredJoint
 }
 
 export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
+    /**
+     * Used to set initialize the physics engine, if none is created when
+     * loading a file. Ideally shouldn't happen, but necessary to support
+     * drag-and-drop via the FilesInput class.
+     * To use, just set this to the value of `await HavokPhysics();`
+     */
     public static s_havokInterface: any;
+
     public name : string = "KHR_rigid_bodies";
+
     public enabled : boolean = true;
     private loader : GLTF2.GLTFLoader;
     private _deferredJoints : Array<DeferredJoint> = []
@@ -524,6 +536,9 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     public async loadSceneAsync(context : string, scene : GLTF2.IScene) : Promise<void> {
         if (!this._babylonScene.getPhysicsEngine()) {
+            // This codepath can be hit if we're loading a file before physics has been
+            // initialized. Ideally the user would enable physics beforehand, but the
+            // FilesInput class can do this when drag-and-dropping a file into a scene
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
             const hkPlugin = new HavokPlugin(true, KHR_RigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
