@@ -15,10 +15,6 @@ export class PhysicsMouseSpring
     public raycastResult = new PhysicsRaycastResult;
     private highlight: HighlightLayer = null;
 
-    PhysicsMouseSpring()
-    {
-    }
-
     public pickCamera(scene : Scene, camera : Camera) {
         var ray = scene.createPickingRay(scene.pointerX, scene.pointerY, null, camera);
         this.pickRay(scene, ray);
@@ -91,7 +87,9 @@ export class PhysicsMouseSpring
     public release() {
         if (this.hitBody) {
             this.hitBody.transformNode.getScene().defaultCursor = "auto";
-            this.highlight.removeAllMeshes();
+            if (this.highlight) {
+                this.highlight.removeAllMeshes();
+            }
         }
         this.hitBody = null;
     }
