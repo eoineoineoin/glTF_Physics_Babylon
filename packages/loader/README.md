@@ -43,12 +43,5 @@ Load your glTF assets as normal!
 
 ## Demo
 
-You can try out a [live demo](https://eoineoineoin.github.io/glTF_Physics_Babylon/packages/demo/dist/) with samples served from [the specification repository](https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/) - other files can also be dragged-and-dropped into the window to load them.
+You can try out a [live demo](https://eoineoineoin.github.io/glTF_Physics_Babylon/packages/demo/dist/) with samples served from [the specification repository](https://github.com/eoineoineoin/glTF_Physics/tree/master/samples/) - other files can also be dragged-and-dropped into the window to load them, for easy testing.
 
-Alternatively, if you want to run the demo app yourself. Clone this repo, then, in the root of this project:
-
-```
-npm install
-npm run build -w babylon-gltf-rigid-body-loader
-npm run start -w babylon-gltf-rigid-body-loader-demo
-```
