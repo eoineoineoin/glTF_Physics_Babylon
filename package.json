@@ -1,14 +1,6 @@
 {
-  "name": "@babylongltfphysics/top",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "workspaces": [
-      "packages/*"
-  ]
+  "name": "babylon-gltf-rigid-body-loader-top",
+  "private": true,
+  "version": "0.0.1",
+  "workspaces": [ "packages/*" ]
 }

@@ -12,8 +12,8 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { KHR_RigidBodies_Plugin } from "@babylongltfphysics/loader";
-import { MSFT_RigidBodies_Plugin } from "@babylongltfphysics/loader";
+import { KHR_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
+import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
 const g_havokInterface = await HavokPhysics();
 KHR_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
