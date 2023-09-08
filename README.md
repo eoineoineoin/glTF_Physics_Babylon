@@ -11,7 +11,7 @@ If you're using Blender, you can add the [Blender glTF physics](https://github.c
 Install the package:
 
 ```
-npm -i babylon-gltf-rigid-body-loader
+npm install babylon-gltf-rigid-body-loader
 ```
 
 In your project, register the extension with Babylon's glTF loader:
