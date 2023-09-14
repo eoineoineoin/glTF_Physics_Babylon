@@ -28,7 +28,7 @@ import { Physics6DoFConstraint,
     Physics6DoFLimit } from "@babylonjs/core/Physics/v2/physicsConstraint";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
 
-namespace KHR_collision_shapes
+namespace MSFT_collision_primitives
 {
     export class Sphere
     {
@@ -82,7 +82,7 @@ namespace KHR_collision_shapes
         extras : {[key: string]: any} = {}
     }
 
-    export class Shape
+    export class Collider
     {
         type? : string;
         sphere? : Sphere;
@@ -95,11 +95,11 @@ namespace KHR_collision_shapes
 
     export class SceneExt
     {
-        shapes: Array<Shape> = [];
+        colliders: Array<Collider> = [];
     }
 }
 
-namespace KHR_rigid_bodies
+namespace MSFT_rigid_bodies
 {
     export class RigidMotion
     {
@@ -123,15 +123,6 @@ namespace KHR_rigid_bodies
         notCollideWithSystems? : Array<string>;
     }
 
-    export class ConstraintDrive
-    {
-        positionTarget: number = 0;
-        velocityTarget: number = 0;
-        maxForce?: number;
-        damping: number = 0;
-        stiffness: number = 0;
-    }
-
     export class Constraint
     {
         min? : number;
@@ -141,8 +132,6 @@ namespace KHR_rigid_bodies
 
         linearAxes? : Array<number>;
         angularAxes? : Array<number>;
-
-        drive? : ConstraintDrive
 
         extensions : {[key: string]: any} = {}
         extras : {[key: string]: any} = {}
@@ -162,14 +151,14 @@ namespace KHR_rigid_bodies
 
     export class Collider
     {
-        shape? : number;
+        collider? : number;
         physicsMaterial? : number;
         collisionFilter? : number;
     }
 
     export class Trigger
     {
-        shape? : number;
+        collider? : number;
         collisionFilter? : number;
     }
 
@@ -203,22 +192,14 @@ namespace KHR_rigid_bodies
 
 class DeferredJoint
 {
-    jointInfo? : KHR_rigid_bodies.Joint;
+    jointInfo? : MSFT_rigid_bodies.Joint;
     pivotA? : TransformNode;
     pivotB? : TransformNode;
 }
 
-export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
-    /**
-     * Used to set initialize the physics engine, if none is created when
-     * loading a file. Ideally shouldn't happen, but necessary to support
-     * drag-and-drop via the FilesInput class.
-     * To use, just set this to the value of `await HavokPhysics();`
-     */
+export class MSFT_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public static s_havokInterface: any;
-
-    public name : string = "KHR_rigid_bodies";
-
+    public name : string = "MSFT_rigid_bodies";
     public enabled : boolean = true;
     private loader : GLTF2.GLTFLoader;
     private _deferredJoints : Array<DeferredJoint> = []
@@ -244,28 +225,28 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     protected async _constructPhysicsShape(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
-        shapeData: KHR_collision_shapes.Shape,
-        filterData : Nullable<KHR_rigid_bodies.CollisionFilter>,
-        materialData:  Nullable<KHR_rigid_bodies.PhysicsMaterial>,
+        colliderData: MSFT_collision_primitives.Collider,
+        filterData : Nullable<MSFT_rigid_bodies.CollisionFilter>,
+        materialData:  Nullable<MSFT_rigid_bodies.PhysicsMaterial>,
         assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
         let scene = this.loader.babylonScene;
         let physicsShape: Nullable<PhysicsShape> = null;
-        if (shapeData.sphere != undefined) {
-            var sphere = new PhysicsShapeSphere(Vector3.Zero(), shapeData.sphere.radius, scene);
+        if (colliderData.sphere != undefined) {
+            var sphere = new PhysicsShapeSphere(Vector3.Zero(), colliderData.sphere.radius, scene);
             physicsShape = sphere;
         }
-        else if (shapeData.box != undefined) {
-            const size = Vector3.FromArray(shapeData.box.size);
+        else if (colliderData.box != undefined) {
+            const size = Vector3.FromArray(colliderData.box.size);
             var box = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), size, scene);
             physicsShape = box;
         }
-        else if (shapeData.cylinder != undefined) {
-            const pointA = new Vector3(0, 0.5 * shapeData.cylinder.height, 0);
-            const pointB = new Vector3(0, 0.5 * -shapeData.cylinder.height, 0);
+        else if (colliderData.cylinder != undefined) {
+            const pointA = new Vector3(0, 0.5 * colliderData.cylinder.height, 0);
+            const pointB = new Vector3(0, 0.5 * -colliderData.cylinder.height, 0);
 
-            if (shapeData.cylinder.radiusTop == shapeData.cylinder.radiusBottom) {
-                var cylinder = new PhysicsShapeCylinder(pointA, pointB, shapeData.cylinder.radiusTop, scene);
+            if (colliderData.cylinder.radiusTop == colliderData.cylinder.radiusBottom) {
+                var cylinder = new PhysicsShapeCylinder(pointA, pointB, colliderData.cylinder.radiusTop, scene);
                 physicsShape = cylinder;
             } else {
                 //<todo We're approximating this with a convex hull - should get the physics engine
@@ -277,13 +258,13 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 for(let i = 0; i < numDivisions; i++) {
                     const c = Math.cos(2 * Math.PI * i / (numDivisions - 1));
                     const s = Math.sin(2 * Math.PI * i / (numDivisions - 1));
-                    positions.push(c * shapeData.cylinder.radiusTop);
-                    positions.push(0.5 * shapeData.cylinder.height);
-                    positions.push(s * shapeData.cylinder.radiusTop);
+                    positions.push(c * colliderData.cylinder.radiusTop);
+                    positions.push(0.5 * colliderData.cylinder.height);
+                    positions.push(s * colliderData.cylinder.radiusTop);
 
-                    positions.push(c * shapeData.cylinder.radiusBottom);
-                    positions.push(-0.5 * shapeData.cylinder.height);
-                    positions.push(s * shapeData.cylinder.radiusBottom);
+                    positions.push(c * colliderData.cylinder.radiusBottom);
+                    positions.push(-0.5 * colliderData.cylinder.height);
+                    positions.push(s * colliderData.cylinder.radiusBottom);
                 }
                 var vertexData = new VertexData();
                 vertexData.positions = positions;
@@ -291,8 +272,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 physicsShape = new PhysicsShapeConvexHull(cylinderMesh, scene);
             }
         }
-        else if (shapeData.capsule != undefined) {
-            const capsuleData = shapeData.capsule;
+        else if (colliderData.capsule != undefined) {
+            const capsuleData = colliderData.capsule;
             const pointA = new Vector3(0, 0.5 * capsuleData.height, 0);
             const pointB = new Vector3(0, -0.5 * capsuleData.height, 0);
 
@@ -309,8 +290,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                 templateMesh.dispose();
             }
         }
-        else if (shapeData.convex != undefined) {
-            var meshData = this.loader.gltf.meshes![shapeData.convex.mesh];
+        else if (colliderData.convex != undefined) {
+            var meshData = this.loader.gltf.meshes![colliderData.convex.mesh];
             //<todo I just want to access the mesh object here; not create one in the scene
             //@ts-ignore _loadMeshAsync is private:
             var convexMesh = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
@@ -322,8 +303,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
             physicsShape = new PhysicsShape({ type: PhysicsShapeType.CONVEX_HULL, parameters: { mesh: convexMesh, includeChildMeshes: true }}, scene);
             convexMesh.dispose();
         }
-        else if (shapeData.trimesh != undefined) {
-            var meshData = this.loader.gltf.meshes![shapeData.trimesh.mesh];
+        else if (colliderData.trimesh != undefined) {
+            var meshData = this.loader.gltf.meshes![colliderData.trimesh.mesh];
             //@ts-ignore _loadMeshAsync is private:
             var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
             meshShape.parent = null;
@@ -408,15 +389,15 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructNodeObjects(
         context : string, sceneNode : AbstractMesh, gltfNode : GLTF2.INode,
         assign : ((babylonMesh: TransformNode) => void)) {
-        var extData = gltfNode.extensions!.KHR_rigid_bodies as KHR_rigid_bodies.NodeExt;
+        var extData = gltfNode.extensions!.MSFT_rigid_bodies as MSFT_rigid_bodies.NodeExt;
 
         if (extData.collider != null) //<todo Also handle triggers, once exposed
         {
-            let ext : KHR_collision_shapes.SceneExt = this.loader.gltf.extensions!.KHR_collision_shapes;
-            var rbExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
-            let collider : KHR_collision_shapes.Shape = ext.shapes[extData.collider.shape!];
-            let filter : Nullable<KHR_rigid_bodies.CollisionFilter> = null;
-            let material : Nullable<KHR_rigid_bodies.PhysicsMaterial> = null;
+            let ext : MSFT_collision_primitives.SceneExt = this.loader.gltf.extensions!.MSFT_collision_primitives;
+            var rbExt : MSFT_rigid_bodies.SceneExt = this.loader.gltf.extensions!.MSFT_rigid_bodies;
+            let collider : MSFT_collision_primitives.Collider = ext.colliders[extData.collider.collider!];
+            let filter : Nullable<MSFT_rigid_bodies.CollisionFilter> = null;
+            let material : Nullable<MSFT_rigid_bodies.PhysicsMaterial> = null;
             if (extData.collider.collisionFilter != null) {
                 filter = rbExt.collisionFilters![extData.collider.collisionFilter];
             }
@@ -532,7 +513,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public async loadNodeAsync(context : string, node : GLTF2.INode, assign : ((babylonMesh: TransformNode) => void))
     {
         if (node.extensions != undefined &&
-            node.extensions.KHR_rigid_bodies != undefined &&
+            node.extensions.MSFT_rigid_bodies != undefined &&
             this._physicsVersion == 2)
         {
             //<todo Can this really ever return a transform node? Will need to handle
@@ -547,11 +528,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     public async loadSceneAsync(context : string, scene : GLTF2.IScene) : Promise<void> {
         if (!this._babylonScene.getPhysicsEngine()) {
-            // This codepath can be hit if we're loading a file before physics has been
-            // initialized. Ideally the user would enable physics beforehand, but the
-            // FilesInput class can do this when drag-and-dropping a file into a scene
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
-            const hkPlugin = new HavokPlugin(true, KHR_RigidBodies_Plugin.s_havokInterface);
+            const hkPlugin = new HavokPlugin(true, MSFT_RigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine!.getPluginVersion();
@@ -607,11 +585,10 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         pivotBToBodyB.decompose(undefined, pivotOrientationInB);
         var pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB).multiply(rbBScale);
 
-        var sceneExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+        var sceneExt : MSFT_rigid_bodies.SceneExt = this.loader.gltf.extensions!.MSFT_rigid_bodies;
 
         var limitSet = sceneExt.physicsJointLimits![joint.jointInfo!.jointLimits].limits;
         const nativeLimits: Physics6DoFLimit[] = []
-        let motors: {axis: PhysicsConstraintAxis, drive: KHR_rigid_bodies.ConstraintDrive}[] = [];
         for (const l of limitSet) {
             if (l.linearAxes) {
                 if (l.linearAxes.length == 3) {
@@ -629,11 +606,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                             stiffness: l.springConstant,
                             damping: l.springDamping
                         });
-
-                        if (l.drive) {
-                            motors.push({ axis: axisNative, drive: l.drive });
-                        }
-                    }
+                      }
                 }
             } else if (l.angularAxes) {
                 //<todo Interface doesn't expose explicit 2D limits - they're inferred automatically.
@@ -647,14 +620,9 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                         stiffness: l.springConstant,
                         damping: l.springDamping
                     });
-
-                    if (l.drive) {
-                        motors.push({ axis: axisNative, drive: l.drive });
-                    }
                 }
             }
         }
-
 
         const axisA = (new Vector3(1,0,0)).applyRotationQuaternion(pivotOrientationInA);
         const axisB = (new Vector3(1,0,0)).applyRotationQuaternion(pivotOrientationInB);
@@ -667,32 +635,6 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         //<todo addConstraint() should allow for a null body
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
-
-        let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
-        let wasm = hp._hknp;
-        for (let m of motors) {
-            //@ts-ignore
-            let hpAxis = hp._constraintAxisToNative(m.axis);
-            wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING_MI);
-
-            if (m.drive.velocityTarget != undefined) {
-                wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData, hpAxis, m.drive.velocityTarget);
-            }
-
-            if (m.drive.positionTarget != undefined) {
-                wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData, hpAxis, m.drive.positionTarget);
-
-            }
-
-            wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData, hpAxis, m.drive.stiffness ?? 0);
-            wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData, hpAxis, m.drive.damping ?? 0);
-
-            if (m.drive.maxForce) {
-                constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
-            } else {
-                constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
-            }
-        }
     }
 
     protected _linearIdxToNative(idx: number) : PhysicsConstraintAxis

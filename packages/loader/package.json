@@ -1,16 +1,25 @@
 {
-  "name": "@babylongltfphysics/loader",
-  "version": "1.0.0",
-  "description": "",
+  "name": "babylon-gltf-rigid-body-loader",
+  "version": "0.0.2",
+  "description": "Plugins for loading glTF files with rigid body data in Babylon.JS",
+  "repository": "github:eoineoineoin/glTF_Physics_Babylon",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-      "build": "tsc -b"
+      "build": "tsc -b",
+      "clean": "rimraf dist && rimraf tsconfig.build.tsbuildinfo"
   },
-  "author": "",
+  "author": "Eoin Mcloughlin",
   "license": "MIT",
-  "dependencies": {
-    "@babylonjs/core": "^6.12.3",
+  "peerDependencies": {
+    "@babylonjs/core": "^6.12.3"
+  },
+  "devDependencies": {
     "typescript": "^5.1.6"
-  }
+  },
+  "files": [
+      "dist/*",
+      "LICENSE.txt",
+      "README.md"
+  ]
 }
