@@ -14,7 +14,6 @@ const importsArray = {
     "Physics/v2/physicsMaterial",
     "Physics/v2/physicsBody",
     "Physics/v2/physicsEngineComponent",
-    "Physics/v2/physicsConstrain",
     "Physics/v2/Plugins/havokPlugin",
     "Physics/v2/physicsConstraint"
   ],
