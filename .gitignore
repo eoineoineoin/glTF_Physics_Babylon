@@ -1,0 +1,3 @@
+// default node project gitignore
+node_modules
+dist
