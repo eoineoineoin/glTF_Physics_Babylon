@@ -107,11 +107,14 @@ class App {
         let ul = document.createElement("ul");
         let selectedSceneIndex = 0;
         
-        let searchStr = 'sceneIndex=';
-        let foundLoc = window.location.hash.indexOf(searchStr);
-        if (foundLoc != -1) {
-            let userIdx = window.location.hash.substring(foundLoc + searchStr.length);
-            selectedSceneIndex = +userIdx;
+        let params = this.locationHashParams();
+        if ("sceneIndex" in params) {
+            selectedSceneIndex = +params["sceneIndex"];
+        }
+
+        if ("sceneUrl" in params) {
+            selectedSceneIndex = -1;
+            this.loadSceneUrl(params["sceneUrl"]);
         }
 
         for (let i = 0; i < sceneInfos.length; i++) {
@@ -301,6 +304,15 @@ class App {
         scene.getEngine().runRenderLoop(() => {
             mouseSpringUtil.stepCamera(scene, scene.activeCamera);
         });
+    }
+
+    private locationHashParams(): {[key: string]: string} {
+        let ret = {};
+        for (let p of window.location.hash.slice(1).split("&")) {
+            let kv = p.split("=");
+            ret[kv[0]] = kv[1];
+        }
+        return ret;
     }
 }
 
