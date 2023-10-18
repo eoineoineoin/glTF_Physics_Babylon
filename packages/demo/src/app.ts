@@ -82,6 +82,7 @@ class App {
             }
             */
 
+            scene.skipFrustumClipping = true;
             this.setupEnvironmentTex(scene);
             this.setupPhysics(scene);
             this.setupShadows(scene);
@@ -202,6 +203,7 @@ class App {
 
         this.createDefaultCamera(scene);
         this.setupEnvironmentTex(scene);
+        scene.skipFrustumClipping = true;
         return scene;
     }
 
