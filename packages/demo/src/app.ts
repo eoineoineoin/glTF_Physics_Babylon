@@ -2,7 +2,7 @@ import "@babylonjs/core/Debug/debugLayer";
 import { Vector3 } from "@babylonjs/core";
 import { Engine, Scene, SceneLoader, FreeCamera, TransformNode } from "@babylonjs/core";
 import { ShadowGenerator, IShadowLight } from "@babylonjs/core";
-import { Observable } from "@babylonjs/core";
+import { Observable, PointerEventTypes } from "@babylonjs/core";
 import { FilesInput } from "@babylonjs/core";
 
 import HavokPhysics from "@babylonjs/havok";
@@ -165,6 +165,7 @@ class App {
             this.addCameraKeyboardControl(<FreeCamera>cam);
             if (cam != this._defaultCamera) {
                 (<FreeCamera>cam).speed *= 0.1; // Default is too fast for my liking
+                (<FreeCamera>cam).angularSensibility *= 2;
             }
 
             let li = document.createElement("li");
@@ -216,6 +217,7 @@ class App {
     private createDefaultCamera(scene: Scene): FreeCamera {
         let camera = new FreeCamera("Default Camera", new Vector3(0.1, 1.8, 1.3), scene);
         camera.speed *= 0.1;
+        camera.angularSensibility *= 2;
         camera.setTarget(new Vector3(-0.2, 0.8, -0.3));
         camera.minZ = 0.01;
         camera.maxZ = 100;
@@ -286,6 +288,16 @@ class App {
                 break;
             }
         });
+
+        if (navigator.maxTouchPoints) {
+            scene.onPointerObservable.add((pointerInfo) => {
+                if(pointerInfo.type == PointerEventTypes.POINTERDOWN) {
+                    mouseSpringUtil.pickCamera(scene, scene.activeCamera);
+                } else if (pointerInfo.type == PointerEventTypes.POINTERUP) {
+                    mouseSpringUtil.release();
+                }
+            });
+        }
         scene.getEngine().runRenderLoop(() => {
             mouseSpringUtil.stepCamera(scene, scene.activeCamera);
         });
