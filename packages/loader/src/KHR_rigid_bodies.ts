@@ -125,6 +125,9 @@ namespace KHR_rigid_bodies
 
     export class ConstraintDrive
     {
+        type?: string;
+        mode?: string;
+        axis: number = -1;
         positionTarget: number = 0;
         velocityTarget: number = 0;
         maxForce?: number;
@@ -132,7 +135,7 @@ namespace KHR_rigid_bodies
         stiffness: number = 0;
     }
 
-    export class Constraint
+    export class ConstraintLimit
     {
         min? : number;
         max? : number;
@@ -142,21 +145,20 @@ namespace KHR_rigid_bodies
         linearAxes? : Array<number>;
         angularAxes? : Array<number>;
 
-        drive? : ConstraintDrive
-
         extensions : {[key: string]: any} = {}
         extras : {[key: string]: any} = {}
     }
 
-    export class JointLimitSet
+    export class JointDescription
     {
-        limits: Array<Constraint> = [];
+        limits: Array<ConstraintLimit> = [];
+        drives: Array<ConstraintDrive> = [];
     }
 
     export class Joint
     {
         connectedNode : number = -1;
-        jointLimits : number = -1;
+        joint: number = -1;
         enableCollision : boolean = false;
     }
 
@@ -196,7 +198,7 @@ namespace KHR_rigid_bodies
     export class SceneExt
     {
         physicsMaterials? : Array<PhysicsMaterial>;
-        physicsJointLimits? : Array<JointLimitSet>;
+        physicsJoints? : Array<JointDescription>;
         collisionFilters? : Array<CollisionFilter>;
     }
 }
@@ -609,10 +611,9 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
 
         var sceneExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
 
-        var limitSet = sceneExt.physicsJointLimits![joint.jointInfo!.jointLimits].limits;
+        var jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
         const nativeLimits: Physics6DoFLimit[] = []
-        let motors: {axis: PhysicsConstraintAxis, drive: KHR_rigid_bodies.ConstraintDrive}[] = [];
-        for (const l of limitSet) {
+        for (const l of jointDesc.limits) {
             if (l.linearAxes) {
                 if (l.linearAxes.length == 3) {
                     nativeLimits.push({axis: PhysicsConstraintAxis.LINEAR_DISTANCE, minLimit: l.min, maxLimit: l.max});
@@ -630,10 +631,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                             damping: l.springDamping
                         });
 
-                        if (l.drive) {
-                            motors.push({ axis: axisNative, drive: l.drive });
-                        }
-                    }
+                   }
                 }
             } else if (l.angularAxes) {
                 //<todo Interface doesn't expose explicit 2D limits - they're inferred automatically.
@@ -647,10 +645,6 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                         stiffness: l.springConstant,
                         damping: l.springDamping
                     });
-
-                    if (l.drive) {
-                        motors.push({ axis: axisNative, drive: l.drive });
-                    }
                 }
             }
         }
@@ -668,29 +662,39 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
 
+        //<todo.eoin Temp! Test for motors; convert to real Babylon API
         let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
         let wasm = hp._hknp;
-        for (let m of motors) {
-            //@ts-ignore
-            let hpAxis = hp._constraintAxisToNative(m.axis);
-            wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING_MI);
+        if (jointDesc.drives) {
+            for (const d of jointDesc.drives) {
+                let axisNative = d.type == "linear" ? this._linearIdxToNative(d.axis) : this._angularIdxToNative(d.axis);
 
-            if (m.drive.velocityTarget != undefined) {
-                wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData, hpAxis, m.drive.velocityTarget);
-            }
+                //@ts-ignore
+                let hpAxis = hp._constraintAxisToNative(axisNative);
 
-            if (m.drive.positionTarget != undefined) {
-                wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData, hpAxis, m.drive.positionTarget);
+                if (d.mode == "force") {
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING);
+                } else {
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING_FORCE);
+                }
 
-            }
+                if (d.velocityTarget != undefined) {
+                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData, hpAxis, d.velocityTarget);
+                }
 
-            wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData, hpAxis, m.drive.stiffness ?? 0);
-            wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData, hpAxis, m.drive.damping ?? 0);
+                if (d.positionTarget != undefined) {
+                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData, hpAxis, d.positionTarget);
 
-            if (m.drive.maxForce) {
-                constraintInstance.setAxisMotorMaxForce(m.axis, m.drive.maxForce);
-            } else {
-                constraintInstance.setAxisMotorMaxForce(m.axis, 3.4e38);
+                }
+
+                wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData, hpAxis, d.stiffness ?? 0);
+                wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData, hpAxis, d.damping ?? 0);
+
+                if (d.maxForce) {
+                    constraintInstance.setAxisMotorMaxForce(axisNative, d.maxForce!);
+                } else {
+                    constraintInstance.setAxisMotorMaxForce(axisNative, 3.4e38);
+                }
             }
         }
     }
