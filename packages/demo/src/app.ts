@@ -292,6 +292,20 @@ class App {
             }
         });
 
+        scene.onPointerObservable.add((pointerInfo) => {
+            if (pointerInfo.type == PointerEventTypes.POINTERWHEEL) {
+                //@ts-ignore
+                if (pointerInfo.event.wheelDelta) {
+                    //@ts-ignore
+                    if (pointerInfo.event.wheelDelta > 0) {
+                        mouseSpringUtil.reelOutOnce();
+                    } else {
+                        mouseSpringUtil.reelInOnce();
+                    }
+                }
+            }
+        });
+
         if (navigator.maxTouchPoints) {
             scene.onPointerObservable.add((pointerInfo) => {
                 if(pointerInfo.type == PointerEventTypes.POINTERDOWN) {
