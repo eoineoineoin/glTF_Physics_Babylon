@@ -139,8 +139,8 @@ namespace KHR_rigid_bodies
     {
         min? : number;
         max? : number;
-        springConstant? : number;
-        springDamping? : number;
+        stiffness? : number;
+        damping? : number;
 
         linearAxes? : Array<number>;
         angularAxes? : Array<number>;
@@ -380,13 +380,13 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     private _materialCombineModeToNative(combine: string | undefined): PhysicsMaterialCombineMode | undefined {
         if (!combine) {
             return undefined;
-        } else if (combine == "AVERAGE") {
+        } else if (combine == "average") {
             return PhysicsMaterialCombineMode.ARITHMETIC_MEAN;
-        } else if (combine == "MINIMUM") {
+        } else if (combine == "minimum") {
             return PhysicsMaterialCombineMode.MINIMUM;
-        } else if (combine == "MAXIMUM") {
+        } else if (combine == "maximum") {
             return PhysicsMaterialCombineMode.MAXIMUM;
-        } else if (combine == "MULTIPLY") {
+        } else if (combine == "multiply") {
             return PhysicsMaterialCombineMode.MULTIPLY;
         }
         return undefined;
@@ -627,8 +627,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                             axis: axisNative,
                             minLimit: l.min,
                             maxLimit: l.max,
-                            stiffness: l.springConstant,
-                            damping: l.springDamping
+                            stiffness: l.stiffness,
+                            damping: l.damping
                         });
 
                    }
@@ -642,8 +642,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                         axis: axisNative,
                         minLimit: l.min,
                         maxLimit: l.max,
-                        stiffness: l.springConstant,
-                        damping: l.springDamping
+                        stiffness: l.stiffness,
+                        damping: l.damping
                     });
                 }
             }
