@@ -99,7 +99,7 @@ namespace KHR_collision_shapes
     }
 }
 
-namespace KHR_rigid_bodies
+namespace KHR_physics_rigid_bodies
 {
     export class RigidMotion
     {
@@ -205,12 +205,12 @@ namespace KHR_rigid_bodies
 
 class DeferredJoint
 {
-    jointInfo? : KHR_rigid_bodies.Joint;
+    jointInfo? : KHR_physics_rigid_bodies.Joint;
     pivotA? : TransformNode;
     pivotB? : TransformNode;
 }
 
-export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
+export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
     /**
      * Used to set initialize the physics engine, if none is created when
      * loading a file. Ideally shouldn't happen, but necessary to support
@@ -219,7 +219,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
      */
     public static s_havokInterface: any;
 
-    public name : string = "KHR_rigid_bodies";
+    public name : string = "KHR_physics_rigid_bodies";
 
     public enabled : boolean = true;
     private loader : GLTF2.GLTFLoader;
@@ -247,8 +247,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructPhysicsShape(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
         shapeData: KHR_collision_shapes.Shape,
-        filterData : Nullable<KHR_rigid_bodies.CollisionFilter>,
-        materialData:  Nullable<KHR_rigid_bodies.PhysicsMaterial>,
+        filterData : Nullable<KHR_physics_rigid_bodies.CollisionFilter>,
+        materialData:  Nullable<KHR_physics_rigid_bodies.PhysicsMaterial>,
         assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
         let scene = this.loader.babylonScene;
@@ -410,15 +410,15 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructNodeObjects(
         context : string, sceneNode : AbstractMesh, gltfNode : GLTF2.INode,
         assign : ((babylonMesh: TransformNode) => void)) {
-        var extData = gltfNode.extensions!.KHR_rigid_bodies as KHR_rigid_bodies.NodeExt;
+        var extData = gltfNode.extensions!.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.NodeExt;
 
         if (extData.collider != null) //<todo Also handle triggers, once exposed
         {
             let ext : KHR_collision_shapes.SceneExt = this.loader.gltf.extensions!.KHR_collision_shapes;
-            var rbExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+            var rbExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
             let collider : KHR_collision_shapes.Shape = ext.shapes[extData.collider.shape!];
-            let filter : Nullable<KHR_rigid_bodies.CollisionFilter> = null;
-            let material : Nullable<KHR_rigid_bodies.PhysicsMaterial> = null;
+            let filter : Nullable<KHR_physics_rigid_bodies.CollisionFilter> = null;
+            let material : Nullable<KHR_physics_rigid_bodies.PhysicsMaterial> = null;
             if (extData.collider.collisionFilter != null) {
                 filter = rbExt.collisionFilters![extData.collider.collisionFilter];
             }
@@ -534,7 +534,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public async loadNodeAsync(context : string, node : GLTF2.INode, assign : ((babylonMesh: TransformNode) => void))
     {
         if (node.extensions != undefined &&
-            node.extensions.KHR_rigid_bodies != undefined &&
+            node.extensions.KHR_physics_rigid_bodies != undefined &&
             this._physicsVersion == 2)
         {
             //<todo Can this really ever return a transform node? Will need to handle
@@ -553,7 +553,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
             // initialized. Ideally the user would enable physics beforehand, but the
             // FilesInput class can do this when drag-and-dropping a file into a scene
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
-            const hkPlugin = new HavokPlugin(true, KHR_RigidBodies_Plugin.s_havokInterface);
+            const hkPlugin = new HavokPlugin(true, KHR_PhysicsRigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine!.getPluginVersion();
@@ -609,7 +609,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         pivotBToBodyB.decompose(undefined, pivotOrientationInB);
         var pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB).multiply(rbBScale);
 
-        var sceneExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+        var sceneExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
 
         var jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
         const nativeLimits: Physics6DoFLimit[] = []

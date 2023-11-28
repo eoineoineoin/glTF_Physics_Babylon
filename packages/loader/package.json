@@ -1,6 +1,6 @@
 {
   "name": "babylon-gltf-rigid-body-loader",
-  "version": "0.0.2",
+  "version": "0.2.0",
   "description": "Plugins for loading glTF files with rigid body data in Babylon.JS",
   "repository": "github:eoineoineoin/glTF_Physics_Babylon",
   "main": "dist/index.js",
