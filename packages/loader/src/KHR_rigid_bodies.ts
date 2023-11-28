@@ -673,22 +673,22 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 let hpAxis = hp._constraintAxisToNative(axisNative);
 
                 if (d.mode == "force") {
-                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING);
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData[0], hpAxis, wasm.ConstraintMotorType.SPRING_FORCE);
                 } else {
-                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData, hpAxis, wasm.ConstraintMotorType.SPRING_FORCE);
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData[0], hpAxis, wasm.ConstraintMotorType.SPRING_ACCELERATION);
                 }
 
                 if (d.velocityTarget != undefined) {
-                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData, hpAxis, d.velocityTarget);
+                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData[0], hpAxis, d.velocityTarget);
                 }
 
                 if (d.positionTarget != undefined) {
-                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData, hpAxis, d.positionTarget);
+                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData[0], hpAxis, d.positionTarget);
 
                 }
 
-                wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData, hpAxis, d.stiffness ?? 0);
-                wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData, hpAxis, d.damping ?? 0);
+                wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData[0], hpAxis, d.stiffness ?? 0);
+                wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData[0], hpAxis, d.damping ?? 0);
 
                 if (d.maxForce) {
                     constraintInstance.setAxisMotorMaxForce(axisNative, d.maxForce!);
