@@ -11,8 +11,8 @@
   "author": "Eoin Mcloughlin",
   "license": "MIT",
   "dependencies": {
-    "@babylonjs/core": "^6.12.3",
-    "@babylonjs/havok": "^1.1.0",
+    "@babylonjs/core": "^6.29.2",
+    "@babylonjs/havok": "^1.3.0",
     "@babylonjs/loaders": "^6.12.3",
     "@babylonjs/materials": "^6.12.3",
     "babylon-gltf-rigid-body-loader": "^0.2.0"
