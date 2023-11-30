@@ -15,7 +15,7 @@
     "@babylonjs/havok": "^1.1.0",
     "@babylonjs/loaders": "^6.12.3",
     "@babylonjs/materials": "^6.12.3",
-    "babylon-gltf-rigid-body-loader": "^0.0.1"
+    "babylon-gltf-rigid-body-loader": "^0.2.0"
   },
   "devDependencies": {
     "html-webpack-plugin": "^5.5.3",

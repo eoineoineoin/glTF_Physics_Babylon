@@ -2,7 +2,7 @@ import "@babylonjs/core/Debug/debugLayer";
 import { Vector3 } from "@babylonjs/core";
 import { Engine, Scene, SceneLoader, FreeCamera, TransformNode } from "@babylonjs/core";
 import { ShadowGenerator, IShadowLight } from "@babylonjs/core";
-import { Observable } from "@babylonjs/core";
+import { Observable, PointerEventTypes } from "@babylonjs/core";
 import { FilesInput } from "@babylonjs/core";
 
 import HavokPhysics from "@babylonjs/havok";
@@ -12,13 +12,13 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { KHR_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
+import { KHR_PhysicsRigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
 const g_havokInterface = await HavokPhysics();
-KHR_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
+KHR_PhysicsRigidBodies_Plugin.s_havokInterface = g_havokInterface;
 GLTF2.GLTFLoader.RegisterExtension(
-   "KHR_rigid_bodies", function (loader) { return new KHR_RigidBodies_Plugin(loader); } );
+   "KHR_physics_rigid_bodies", function (loader) { return new KHR_PhysicsRigidBodies_Plugin(loader); } );
 MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
 GLTF2.GLTFLoader.RegisterExtension(
    "MSFT_rigid_bodies", function (loader) { return new MSFT_RigidBodies_Plugin(loader); } );
@@ -82,6 +82,7 @@ class App {
             }
             */
 
+            scene.skipFrustumClipping = true;
             this.setupEnvironmentTex(scene);
             this.setupPhysics(scene);
             this.setupShadows(scene);
@@ -106,11 +107,14 @@ class App {
         let ul = document.createElement("ul");
         let selectedSceneIndex = 0;
         
-        let searchStr = 'sceneIndex=';
-        let foundLoc = window.location.hash.indexOf(searchStr);
-        if (foundLoc != -1) {
-            let userIdx = window.location.hash.substring(foundLoc + searchStr.length);
-            selectedSceneIndex = +userIdx;
+        let params = this.locationHashParams();
+        if ("sceneIndex" in params) {
+            selectedSceneIndex = +params["sceneIndex"];
+        }
+
+        if ("sceneUrl" in params) {
+            selectedSceneIndex = -1;
+            this.loadSceneUrl(params["sceneUrl"]);
         }
 
         for (let i = 0; i < sceneInfos.length; i++) {
@@ -164,6 +168,7 @@ class App {
             this.addCameraKeyboardControl(<FreeCamera>cam);
             if (cam != this._defaultCamera) {
                 (<FreeCamera>cam).speed *= 0.1; // Default is too fast for my liking
+                (<FreeCamera>cam).angularSensibility *= 2;
             }
 
             let li = document.createElement("li");
@@ -202,6 +207,7 @@ class App {
 
         this.createDefaultCamera(scene);
         this.setupEnvironmentTex(scene);
+        scene.skipFrustumClipping = true;
         return scene;
     }
 
@@ -214,6 +220,7 @@ class App {
     private createDefaultCamera(scene: Scene): FreeCamera {
         let camera = new FreeCamera("Default Camera", new Vector3(0.1, 1.8, 1.3), scene);
         camera.speed *= 0.1;
+        camera.angularSensibility *= 2;
         camera.setTarget(new Vector3(-0.2, 0.8, -0.3));
         camera.minZ = 0.01;
         camera.maxZ = 100;
@@ -284,9 +291,42 @@ class App {
                 break;
             }
         });
+
+        scene.onPointerObservable.add((pointerInfo) => {
+            if (pointerInfo.type == PointerEventTypes.POINTERWHEEL) {
+                //@ts-ignore
+                if (pointerInfo.event.wheelDelta) {
+                    //@ts-ignore
+                    if (pointerInfo.event.wheelDelta > 0) {
+                        mouseSpringUtil.reelOutOnce();
+                    } else {
+                        mouseSpringUtil.reelInOnce();
+                    }
+                }
+            }
+        });
+
+        if (navigator.maxTouchPoints) {
+            scene.onPointerObservable.add((pointerInfo) => {
+                if(pointerInfo.type == PointerEventTypes.POINTERDOWN) {
+                    mouseSpringUtil.pickCamera(scene, scene.activeCamera);
+                } else if (pointerInfo.type == PointerEventTypes.POINTERUP) {
+                    mouseSpringUtil.release();
+                }
+            });
+        }
         scene.getEngine().runRenderLoop(() => {
             mouseSpringUtil.stepCamera(scene, scene.activeCamera);
         });
+    }
+
+    private locationHashParams(): {[key: string]: string} {
+        let ret = {};
+        for (let p of window.location.hash.slice(1).split("&")) {
+            let kv = p.split("=");
+            ret[kv[0]] = kv[1];
+        }
+        return ret;
     }
 }
 

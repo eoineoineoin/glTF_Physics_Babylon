@@ -99,7 +99,7 @@ namespace KHR_collision_shapes
     }
 }
 
-namespace KHR_rigid_bodies
+namespace KHR_physics_rigid_bodies
 {
     export class RigidMotion
     {
@@ -123,12 +123,24 @@ namespace KHR_rigid_bodies
         notCollideWithSystems? : Array<string>;
     }
 
-    export class Constraint
+    export class ConstraintDrive
+    {
+        type?: string;
+        mode?: string;
+        axis: number = -1;
+        positionTarget: number = 0;
+        velocityTarget: number = 0;
+        maxForce?: number;
+        damping: number = 0;
+        stiffness: number = 0;
+    }
+
+    export class ConstraintLimit
     {
         min? : number;
         max? : number;
-        springConstant? : number;
-        springDamping? : number;
+        stiffness? : number;
+        damping? : number;
 
         linearAxes? : Array<number>;
         angularAxes? : Array<number>;
@@ -137,15 +149,16 @@ namespace KHR_rigid_bodies
         extras : {[key: string]: any} = {}
     }
 
-    export class JointLimitSet
+    export class JointDescription
     {
-        limits: Array<Constraint> = [];
+        limits: Array<ConstraintLimit> = [];
+        drives: Array<ConstraintDrive> = [];
     }
 
     export class Joint
     {
         connectedNode : number = -1;
-        jointLimits : number = -1;
+        joint: number = -1;
         enableCollision : boolean = false;
     }
 
@@ -185,19 +198,19 @@ namespace KHR_rigid_bodies
     export class SceneExt
     {
         physicsMaterials? : Array<PhysicsMaterial>;
-        physicsJointLimits? : Array<JointLimitSet>;
+        physicsJoints? : Array<JointDescription>;
         collisionFilters? : Array<CollisionFilter>;
     }
 }
 
 class DeferredJoint
 {
-    jointInfo? : KHR_rigid_bodies.Joint;
+    jointInfo? : KHR_physics_rigid_bodies.Joint;
     pivotA? : TransformNode;
     pivotB? : TransformNode;
 }
 
-export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
+export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
     /**
      * Used to set initialize the physics engine, if none is created when
      * loading a file. Ideally shouldn't happen, but necessary to support
@@ -206,7 +219,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
      */
     public static s_havokInterface: any;
 
-    public name : string = "KHR_rigid_bodies";
+    public name : string = "KHR_physics_rigid_bodies";
 
     public enabled : boolean = true;
     private loader : GLTF2.GLTFLoader;
@@ -234,8 +247,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructPhysicsShape(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
         shapeData: KHR_collision_shapes.Shape,
-        filterData : Nullable<KHR_rigid_bodies.CollisionFilter>,
-        materialData:  Nullable<KHR_rigid_bodies.PhysicsMaterial>,
+        filterData : Nullable<KHR_physics_rigid_bodies.CollisionFilter>,
+        materialData:  Nullable<KHR_physics_rigid_bodies.PhysicsMaterial>,
         assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
         let scene = this.loader.babylonScene;
@@ -367,13 +380,13 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     private _materialCombineModeToNative(combine: string | undefined): PhysicsMaterialCombineMode | undefined {
         if (!combine) {
             return undefined;
-        } else if (combine == "AVERAGE") {
+        } else if (combine == "average") {
             return PhysicsMaterialCombineMode.ARITHMETIC_MEAN;
-        } else if (combine == "MINIMUM") {
+        } else if (combine == "minimum") {
             return PhysicsMaterialCombineMode.MINIMUM;
-        } else if (combine == "MAXIMUM") {
+        } else if (combine == "maximum") {
             return PhysicsMaterialCombineMode.MAXIMUM;
-        } else if (combine == "MULTIPLY") {
+        } else if (combine == "multiply") {
             return PhysicsMaterialCombineMode.MULTIPLY;
         }
         return undefined;
@@ -397,15 +410,15 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructNodeObjects(
         context : string, sceneNode : AbstractMesh, gltfNode : GLTF2.INode,
         assign : ((babylonMesh: TransformNode) => void)) {
-        var extData = gltfNode.extensions!.KHR_rigid_bodies as KHR_rigid_bodies.NodeExt;
+        var extData = gltfNode.extensions!.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.NodeExt;
 
         if (extData.collider != null) //<todo Also handle triggers, once exposed
         {
             let ext : KHR_collision_shapes.SceneExt = this.loader.gltf.extensions!.KHR_collision_shapes;
-            var rbExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+            var rbExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
             let collider : KHR_collision_shapes.Shape = ext.shapes[extData.collider.shape!];
-            let filter : Nullable<KHR_rigid_bodies.CollisionFilter> = null;
-            let material : Nullable<KHR_rigid_bodies.PhysicsMaterial> = null;
+            let filter : Nullable<KHR_physics_rigid_bodies.CollisionFilter> = null;
+            let material : Nullable<KHR_physics_rigid_bodies.PhysicsMaterial> = null;
             if (extData.collider.collisionFilter != null) {
                 filter = rbExt.collisionFilters![extData.collider.collisionFilter];
             }
@@ -521,7 +534,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
     public async loadNodeAsync(context : string, node : GLTF2.INode, assign : ((babylonMesh: TransformNode) => void))
     {
         if (node.extensions != undefined &&
-            node.extensions.KHR_rigid_bodies != undefined &&
+            node.extensions.KHR_physics_rigid_bodies != undefined &&
             this._physicsVersion == 2)
         {
             //<todo Can this really ever return a transform node? Will need to handle
@@ -540,7 +553,7 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
             // initialized. Ideally the user would enable physics beforehand, but the
             // FilesInput class can do this when drag-and-dropping a file into a scene
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
-            const hkPlugin = new HavokPlugin(true, KHR_RigidBodies_Plugin.s_havokInterface);
+            const hkPlugin = new HavokPlugin(true, KHR_PhysicsRigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine!.getPluginVersion();
@@ -596,11 +609,11 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         pivotBToBodyB.decompose(undefined, pivotOrientationInB);
         var pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB).multiply(rbBScale);
 
-        var sceneExt : KHR_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_rigid_bodies;
+        var sceneExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
 
-        var limitSet = sceneExt.physicsJointLimits![joint.jointInfo!.jointLimits].limits;
+        var jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
         const nativeLimits: Physics6DoFLimit[] = []
-        for (const l of limitSet) {
+        for (const l of jointDesc.limits) {
             if (l.linearAxes) {
                 if (l.linearAxes.length == 3) {
                     nativeLimits.push({axis: PhysicsConstraintAxis.LINEAR_DISTANCE, minLimit: l.min, maxLimit: l.max});
@@ -614,10 +627,11 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                             axis: axisNative,
                             minLimit: l.min,
                             maxLimit: l.max,
-                            stiffness: l.springConstant,
-                            damping: l.springDamping
+                            stiffness: l.stiffness,
+                            damping: l.damping
                         });
-                      }
+
+                   }
                 }
             } else if (l.angularAxes) {
                 //<todo Interface doesn't expose explicit 2D limits - they're inferred automatically.
@@ -628,8 +642,8 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
                         axis: axisNative,
                         minLimit: l.min,
                         maxLimit: l.max,
-                        stiffness: l.springConstant,
-                        damping: l.springDamping
+                        stiffness: l.stiffness,
+                        damping: l.damping
                     });
                 }
             }
@@ -647,6 +661,42 @@ export class KHR_RigidBodies_Plugin implements IGLTFLoaderExtension  {
         //<todo addConstraint() should allow for a null body
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
+
+        //<todo.eoin Temp! Test for motors; convert to real Babylon API
+        let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
+        let wasm = hp._hknp;
+        if (jointDesc.drives) {
+            for (const d of jointDesc.drives) {
+                let axisNative = d.type == "linear" ? this._linearIdxToNative(d.axis) : this._angularIdxToNative(d.axis);
+
+                //@ts-ignore
+                let hpAxis = hp._constraintAxisToNative(axisNative);
+
+                if (d.mode == "force") {
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData[0], hpAxis, wasm.ConstraintMotorType.SPRING_FORCE);
+                } else {
+                    wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData[0], hpAxis, wasm.ConstraintMotorType.SPRING_ACCELERATION);
+                }
+
+                if (d.velocityTarget != undefined) {
+                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData[0], hpAxis, d.velocityTarget);
+                }
+
+                if (d.positionTarget != undefined) {
+                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData[0], hpAxis, d.positionTarget);
+
+                }
+
+                wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData[0], hpAxis, d.stiffness ?? 0);
+                wasm.HP_Constraint_SetAxisMotorDamping(constraintInstance._pluginData[0], hpAxis, d.damping ?? 0);
+
+                if (d.maxForce) {
+                    constraintInstance.setAxisMotorMaxForce(axisNative, d.maxForce!);
+                } else {
+                    constraintInstance.setAxisMotorMaxForce(axisNative, 3.4e38);
+                }
+            }
+        }
     }
 
     protected _linearIdxToNative(idx: number) : PhysicsConstraintAxis
