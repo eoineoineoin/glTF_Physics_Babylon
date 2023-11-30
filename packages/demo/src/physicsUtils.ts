@@ -10,6 +10,7 @@ export class PhysicsMouseSpring
     private hitInstanceIndex: number = -1;
     private pickInBodySpace : Vector3 = Vector3.Zero();
     private hitDistance : number = 0;
+    private goalHitDistance : number = 0;
     public springConstant : number = 500;
     public reelIn = false;
     public raycastResult = new PhysicsRaycastResult;
@@ -38,6 +39,7 @@ export class PhysicsMouseSpring
                 this.pickInBodySpace = Vector3.TransformCoordinates(
                     this.raycastResult.hitPointWorld, bodyFromWorld);
                 this.hitDistance = this.raycastResult.hitDistance;
+                this.goalHitDistance = this.raycastResult.hitDistance;
 
                 scene.defaultCursor = "pointer";
             }
@@ -110,6 +112,8 @@ export class PhysicsMouseSpring
             this.hitDistance *= 0.9;
         }
 
+        this.hitDistance = this.hitDistance + (this.goalHitDistance - this.hitDistance) * 0.2;
+
         var desiredPickEnd = ray.origin.add(ray.direction.scale(this.hitDistance));
         var currentPickEnd = Vector3.TransformCoordinates(
             this.pickInBodySpace, this._getWorldFromHit());
@@ -163,6 +167,14 @@ export class PhysicsMouseSpring
             }
             this.hitBody.applyImpulse(impulse, currentPickEnd, this.hitInstanceIndex);
         }
+    }
+
+    public reelInOnce() {
+        this.goalHitDistance *= 0.9;
+    }
+
+    public reelOutOnce() {
+        this.goalHitDistance /= 0.9;
     }
 
     protected _getWorldFromHit(): Matrix {
