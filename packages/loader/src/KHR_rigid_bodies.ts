@@ -172,6 +172,7 @@ namespace KHR_physics_rigid_bodies
     export class Trigger
     {
         shape? : number;
+        nodes? : Array<number>;
         collisionFilter? : number;
     }
 
@@ -482,11 +483,20 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 sceneNode.physicsBody = new PhysicsBody(sceneNode, motionType, false, this.loader.babylonScene);
 
                 if (extData.motion.linearVelocity != null) {
-                    sceneNode.physicsBody.setLinearVelocity(Vector3.FromArray(extData.motion.linearVelocity));
+                    let lv = Vector3.FromArray(extData.motion.linearVelocity);
+                    if (!sceneNode.getScene().useRightHandedSystem) {
+                        lv.x *= -1;
+                    }
+                    sceneNode.physicsBody.setLinearVelocity(lv);
                 }
 
                 if (extData.motion.angularVelocity != null) {
-                    sceneNode.physicsBody.setAngularVelocity(Vector3.FromArray(extData.motion.angularVelocity));
+                    let av = Vector3.FromArray(extData.motion.angularVelocity);
+                    if (!sceneNode.getScene().useRightHandedSystem) {
+                        av.y *= -1;
+                        av.z *= -1;
+                    }
+                    sceneNode.physicsBody.setAngularVelocity(av);
                 }
 
                 var massProps : PhysicsMassProperties = {};
