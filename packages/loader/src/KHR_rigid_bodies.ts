@@ -172,6 +172,7 @@ namespace KHR_physics_rigid_bodies
     export class Trigger
     {
         shape? : number;
+        nodes? : Array<number>;
         collisionFilter? : number;
     }
 
