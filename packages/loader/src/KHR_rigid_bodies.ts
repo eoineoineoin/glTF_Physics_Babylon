@@ -66,17 +66,15 @@ namespace KHR_collision_shapes
         extras : {[key: string]: any} = {}
     }
 
-    export class Convex
+    export class Mesh
     {
         mesh: number = -1;
+        convexHull: boolean = false;
 
-        extensions : {[key: string]: any} = {}
-        extras : {[key: string]: any} = {}
-    }
-
-    export class TriMesh
-    {
-        mesh: number = -1;
+        //<todo.eoin These properties are currently unhandled.
+        // Need to expose this functionality from WASM and write Babylon support
+        skin: number = -1;
+        weights: number[]|undefined = undefined;
 
         extensions : {[key: string]: any} = {}
         extras : {[key: string]: any} = {}
@@ -89,8 +87,7 @@ namespace KHR_collision_shapes
         box? : Box;
         capsule? : Capsule;
         cylinder? : Cylinder;
-        convex? : Convex;
-        trimesh? : TriMesh;
+        mesh? : Mesh;
     }
 
     export class SceneExt
@@ -312,21 +309,9 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 templateMesh.dispose();
             }
         }
-        else if (shapeData.convex != undefined) {
-            var meshData = this.loader.gltf.meshes![shapeData.convex.mesh];
+        else if (shapeData.mesh != undefined) {
+            var meshData = this.loader.gltf.meshes![shapeData.mesh.mesh];
             //<todo I just want to access the mesh object here; not create one in the scene
-            //@ts-ignore _loadMeshAsync is private:
-            var convexMesh = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
-            convexMesh.parent = null;
-            convexMesh.position = Vector3.Zero();
-            convexMesh.rotationQuaternion = Quaternion.Identity();
-            convexMesh.scaling = Vector3.One();
-
-            physicsShape = new PhysicsShape({ type: PhysicsShapeType.CONVEX_HULL, parameters: { mesh: convexMesh, includeChildMeshes: true }}, scene);
-            convexMesh.dispose();
-        }
-        else if (shapeData.trimesh != undefined) {
-            var meshData = this.loader.gltf.meshes![shapeData.trimesh.mesh];
             //@ts-ignore _loadMeshAsync is private:
             var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
             meshShape.parent = null;
@@ -334,7 +319,8 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
             meshShape.rotationQuaternion = Quaternion.Identity();
             meshShape.scaling = Vector3.One();
 
-            physicsShape = new PhysicsShape({ type: PhysicsShapeType.MESH, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
+            let shapeType = shapeData.mesh.convexHull ? PhysicsShapeType.CONVEX_HULL : PhysicsShapeType.MESH;
+            physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
             meshShape.dispose();
         }
 
