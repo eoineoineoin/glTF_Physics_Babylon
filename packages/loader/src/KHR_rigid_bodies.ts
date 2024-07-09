@@ -69,7 +69,6 @@ namespace KHR_collision_shapes
     export class Mesh
     {
         mesh: number = -1;
-        convexHull: boolean = false;
 
         //<todo.eoin These properties are currently unhandled.
         // Need to expose this functionality from WASM and write Babylon support
@@ -88,6 +87,9 @@ namespace KHR_collision_shapes
         capsule? : Capsule;
         cylinder? : Cylinder;
         mesh? : Mesh;
+
+        extensions : {[key: string]: any} = {}
+        extras : {[key: string]: any} = {}
     }
 
     export class SceneExt
@@ -171,6 +173,11 @@ namespace KHR_physics_rigid_bodies
         shape? : number;
         nodes? : Array<number>;
         collisionFilter? : number;
+    }
+
+    export class ShapeExt
+    {
+        convexHull: boolean = false;
     }
 
     export class NodeExt
@@ -319,7 +326,13 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
             meshShape.rotationQuaternion = Quaternion.Identity();
             meshShape.scaling = Vector3.One();
 
-            let shapeType = shapeData.mesh.convexHull ? PhysicsShapeType.CONVEX_HULL : PhysicsShapeType.MESH;
+            let shapeType = PhysicsShapeType.MESH;
+            if (shapeData.extensions && shapeData.extensions.KHR_physics_rigid_bodies) {
+                var shapeExt = shapeData.extensions.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.ShapeExt;
+                if (shapeExt.convexHull) {
+                    shapeType = PhysicsShapeType.CONVEX_HULL;
+                }
+            }
             physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
             meshShape.dispose();
         }
