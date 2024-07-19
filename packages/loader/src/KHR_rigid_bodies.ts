@@ -593,34 +593,46 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
     }
 
     protected make6DoFJoint(joint : DeferredJoint) {
-        // Get transform from parent RB?
-        var rbA = this._getParentRigidBody(joint.pivotA!)!;
-        var rbB = this._getParentRigidBody(joint.pivotB ?? null);
+        // Get transform from parent RB
+        let rbA = this._getParentRigidBody(joint.pivotA!)!;
+        let rbB = this._getParentRigidBody(joint.pivotB ?? null);
 
-        var rbAToWorld = rbA.computeWorldMatrix(true);
-        var rbAScale = Vector3.One();
-        rbAToWorld.decompose(rbAScale);
+        rbA.computeWorldMatrix(true);
+        let rbAToWorld = Matrix.Compose(Vector3.One(), rbA.absoluteRotationQuaternion, rbA.absolutePosition);
 
-        var pivotAToWorld = joint.pivotA!.computeWorldMatrix(true);
-        var pivotAToBodyA = pivotAToWorld.multiply(Matrix.Invert(rbAToWorld));
-        var pivotOrientationInA = Quaternion.Identity();
+        joint.pivotA!.computeWorldMatrix(true);
+        let pivotAToWorld = Matrix.Compose(Vector3.One(), joint.pivotA!.absoluteRotationQuaternion, joint.pivotA!.absolutePosition);
+
+        let pivotAToBodyA = pivotAToWorld.multiply(Matrix.Invert(rbAToWorld));
+        let pivotOrientationInA = Quaternion.Identity();
         pivotAToBodyA.decompose(undefined, pivotOrientationInA);
-        var pivotTranslationInA = Vector3.TransformCoordinates(Vector3.Zero(), pivotAToBodyA).multiply(rbAScale);
+        let pivotTranslationInA = Vector3.TransformCoordinates(Vector3.Zero(), pivotAToBodyA);
 
+        if (rbB) {
+            rbB.computeWorldMatrix(true);
+        }
+        let rbBToWorld = Matrix.Compose(Vector3.One(), (rbB ?? rbA).absoluteRotationQuaternion, (rbB ?? rbA).absolutePosition);
 
-        var rbBToWorld = (rbB ?? rbA).computeWorldMatrix(true);
-        var rbBScale = Vector3.One();
-        rbBToWorld.decompose(rbBScale);
+        if (joint.pivotB) {
+            joint.pivotB.computeWorldMatrix(true);
+        }
 
-        var pivotBToWorld = (joint.pivotB ?? joint.pivotA!).computeWorldMatrix(true);
-        var pivotBToBodyB = pivotBToWorld.multiply(Matrix.Invert(rbBToWorld));
-        var pivotOrientationInB = Quaternion.Identity();
+        let pivotB = joint.pivotB ?? joint.pivotA!;
+        let pivotBToWorld = Matrix.Compose(Vector3.One(), pivotB.absoluteRotationQuaternion, pivotB.absolutePosition);
+        let pivotBToBodyB = pivotBToWorld.multiply(Matrix.Invert(rbBToWorld));
+
+        let pivotOrientationInB = Quaternion.Identity();
         pivotBToBodyB.decompose(undefined, pivotOrientationInB);
-        var pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB).multiply(rbBScale);
+        let pivotTranslationInB = Vector3.TransformCoordinates(Vector3.Zero(), pivotBToBodyB);
 
-        var sceneExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
+        let sceneExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
 
-        var jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
+        // Special handling of constraint basis when Babylon is in left-handed mode. This is a little
+        // bit hacky; might need to calculate this properly, in case the scene nodes contain
+        // mirrored nodes. todo: validate when this can cause a problem
+        const isLeftHanded = !joint.pivotA!.getScene().useRightHandedSystem;
+
+        let jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
         const nativeLimits: Physics6DoFLimit[] = []
         for (const l of jointDesc.limits) {
             if (l.linearAxes) {
@@ -632,10 +644,12 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 else {
                     for (const axIdx of l.linearAxes) {
                         let axisNative = this._linearIdxToNative(axIdx);
+                        const minLimit = (isLeftHanded) ? (l.max != undefined ? -l.max : undefined) : l.min;
+                        const maxLimit = (isLeftHanded) ? (l.min != undefined ? -l.min : undefined) : l.max;
                         nativeLimits.push({
                             axis: axisNative,
-                            minLimit: l.min,
-                            maxLimit: l.max,
+                            minLimit: minLimit,
+                            maxLimit: maxLimit,
                             stiffness: l.stiffness,
                             damping: l.damping
                         });
@@ -658,20 +672,21 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
             }
         }
 
-
-        const axisA = (new Vector3(1,0,0)).applyRotationQuaternion(pivotOrientationInA);
-        const axisB = (new Vector3(1,0,0)).applyRotationQuaternion(pivotOrientationInB);
+        const xDir = isLeftHanded ? -1 : 1;
+        const axisA = (new Vector3(xDir,0,0)).applyRotationQuaternion(pivotOrientationInA);
+        const axisB = (new Vector3(xDir,0,0)).applyRotationQuaternion(pivotOrientationInB);
 
         const perpAxisA = (new Vector3(0,1,0)).applyRotationQuaternion(pivotOrientationInA);
         const perpAxisB = (new Vector3(0,1,0)).applyRotationQuaternion(pivotOrientationInB);
-        var constraintInstance = new Physics6DoFConstraint( {
+
+        let constraintInstance = new Physics6DoFConstraint( {
             pivotA: pivotTranslationInA, pivotB: pivotTranslationInB,
             axisA: axisA, axisB: axisB, perpAxisA: perpAxisA, perpAxisB: perpAxisB}, nativeLimits, this.loader.babylonScene);
         //<todo addConstraint() should allow for a null body
         rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
 
-        //<todo.eoin Temp! Test for motors; convert to real Babylon API
+        //<todo Temp setup for motors; convert to real Babylon API once exposed
         let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
         let wasm = hp._hknp;
         if (jointDesc.drives) {
@@ -687,13 +702,13 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                     wasm.HP_Constraint_SetAxisMotorType(constraintInstance._pluginData[0], hpAxis, wasm.ConstraintMotorType.SPRING_ACCELERATION);
                 }
 
+                const lhFactor = (isLeftHanded && d.type == "linear") ? -1 : 1;
                 if (d.velocityTarget != undefined) {
-                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData[0], hpAxis, d.velocityTarget);
+                    wasm.HP_Constraint_SetAxisMotorVelocityTarget(constraintInstance._pluginData[0], hpAxis, d.velocityTarget * lhFactor);
                 }
 
                 if (d.positionTarget != undefined) {
-                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData[0], hpAxis, d.positionTarget);
-
+                    wasm.HP_Constraint_SetAxisMotorPositionTarget(constraintInstance._pluginData[0], hpAxis, d.positionTarget * lhFactor);
                 }
 
                 wasm.HP_Constraint_SetAxisMotorStiffness(constraintInstance._pluginData[0], hpAxis, d.stiffness ?? 0);
