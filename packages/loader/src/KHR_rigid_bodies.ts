@@ -27,8 +27,9 @@ import "@babylonjs/core/Physics/v2/physicsEngineComponent";
 import { Physics6DoFConstraint,
     Physics6DoFLimit } from "@babylonjs/core/Physics/v2/physicsConstraint";
 import { HavokPlugin } from "@babylonjs/core/Physics/v2/Plugins/havokPlugin";
+import {PhysicsViewer} from "@babylonjs/core/Debug/physicsViewer";
 
-namespace KHR_collision_shapes
+namespace KHR_implicit_shapes
 {
     export class Sphere
     {
@@ -66,19 +67,6 @@ namespace KHR_collision_shapes
         extras : {[key: string]: any} = {}
     }
 
-    export class Mesh
-    {
-        mesh: number = -1;
-
-        //<todo.eoin These properties are currently unhandled.
-        // Need to expose this functionality from WASM and write Babylon support
-        skin: number = -1;
-        weights: number[]|undefined = undefined;
-
-        extensions : {[key: string]: any} = {}
-        extras : {[key: string]: any} = {}
-    }
-
     export class Shape
     {
         type? : string;
@@ -86,7 +74,6 @@ namespace KHR_collision_shapes
         box? : Box;
         capsule? : Capsule;
         cylinder? : Cylinder;
-        mesh? : Mesh;
 
         extensions : {[key: string]: any} = {}
         extras : {[key: string]: any} = {}
@@ -161,23 +148,25 @@ namespace KHR_physics_rigid_bodies
         enableCollision : boolean = false;
     }
 
-    export class Collider
+    export class Geometry
     {
         shape? : number;
+        node? : number;
+        convexHull? : boolean;
+    }
+
+    export class Collider
+    {
+        geometry : Geometry = {};
         physicsMaterial? : number;
         collisionFilter? : number;
     }
 
     export class Trigger
     {
-        shape? : number;
+        geometry? : Geometry;
         nodes? : Array<number>;
         collisionFilter? : number;
-    }
-
-    export class ShapeExt
-    {
-        convexHull: boolean = false;
     }
 
     export class NodeExt
@@ -235,6 +224,7 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
     private _layerNames: string[] = [];
     private _userMassProperties: Map<PhysicsBody, PhysicsMassProperties> = new Map<PhysicsBody, PhysicsMassProperties>();
     private _babylonScene: Scene;
+    private _meshesToDispose: TransformNode[] = [];
 
     public constructor(loader : GLTF2.GLTFLoader)
     {
@@ -247,15 +237,15 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     public dispose() : void
     {
+        for (let m of this._meshesToDispose) {
+            m.dispose();
+        }
     }
 
-    protected async _constructPhysicsShape(
+    protected _constructPhysicsShape(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
-        shapeData: KHR_collision_shapes.Shape,
-        filterData : Nullable<KHR_physics_rigid_bodies.CollisionFilter>,
-        materialData:  Nullable<KHR_physics_rigid_bodies.PhysicsMaterial>,
-        assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
-
+        shapeData: KHR_implicit_shapes.Shape,
+        assign: ((babylonMesh: TransformNode) => void)) : Nullable<PhysicsShape> {
         let scene = this.loader.babylonScene;
         let physicsShape: Nullable<PhysicsShape> = null;
         if (shapeData.sphere != undefined) {
@@ -316,31 +306,40 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 templateMesh.dispose();
             }
         }
-        else if (shapeData.mesh != undefined) {
-            var meshData = this.loader.gltf.meshes![shapeData.mesh.mesh];
-            //<todo I just want to access the mesh object here; not create one in the scene
-            //@ts-ignore _loadMeshAsync is private:
-            var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
-            meshShape.parent = null;
-            meshShape.position = Vector3.Zero();
-            meshShape.rotationQuaternion = Quaternion.Identity();
-            meshShape.scaling = Vector3.One();
 
-            let shapeType = PhysicsShapeType.MESH;
-            if (shapeData.extensions && shapeData.extensions.KHR_physics_rigid_bodies) {
-                var shapeExt = shapeData.extensions.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.ShapeExt;
-                if (shapeExt.convexHull) {
-                    shapeType = PhysicsShapeType.CONVEX_HULL;
-                }
-            }
-            physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
-            meshShape.dispose();
-        }
+        return physicsShape;
+    }
 
-        if (physicsShape == undefined) {
-            return null;
-        }
+    protected async _constructPhysicsMesh(
+        context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
+        meshNodeIndex: number, convexHull: boolean,
+        assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
+        let scene = this.loader.babylonScene;
+        var nodeData = this.loader.gltf.nodes![meshNodeIndex];
+        //<todo Need to handle the case where the node doesn't have a mesh, but child nodes do.
+        //< However, the PhysicsShape ctor takes a Mesh, rather than a TransformNode
+        var meshData = this.loader.gltf.meshes![nodeData.mesh!];
+        //<todo I just want to access the mesh object here; not create one in the scene
+        //@ts-ignore _loadMeshAsync is private:
+        var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
+        meshShape.parent = null;
+        meshShape.position = Vector3.Zero();
+        meshShape.rotationQuaternion = Quaternion.Identity();
+        meshShape.scaling = Vector3.One();
+
+        let shapeType = convexHull ? PhysicsShapeType.CONVEX_HULL : PhysicsShapeType.MESH;
+        let physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
+        // Defer disposal of this mesh until later; we can't do it now,
+        // as the same mesh could be used by multiple shape instances.
+        this._meshesToDispose.push(meshShape);
+        return physicsShape;
+    }
+
+    private _setShapeFilterMaterial(
+        physicsShape : PhysicsShape,
+        filterData : Nullable<KHR_physics_rigid_bodies.CollisionFilter>,
+        materialData:  Nullable<KHR_physics_rigid_bodies.PhysicsMaterial>) : PhysicsShape {
         // Add collision filter info
         if (filterData) {
             let filterMembership = 0;
@@ -410,13 +409,12 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
     protected async _constructNodeObjects(
         context : string, sceneNode : AbstractMesh, gltfNode : GLTF2.INode,
         assign : ((babylonMesh: TransformNode) => void)) {
-        var extData = gltfNode.extensions!.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.NodeExt;
+        let extData = gltfNode.extensions!.KHR_physics_rigid_bodies as KHR_physics_rigid_bodies.NodeExt;
 
         if (extData.collider != null) //<todo Also handle triggers, once exposed
         {
-            let ext : KHR_collision_shapes.SceneExt = this.loader.gltf.extensions!.KHR_collision_shapes;
-            var rbExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
-            let collider : KHR_collision_shapes.Shape = ext.shapes[extData.collider.shape!];
+            let shapeExt : KHR_implicit_shapes.SceneExt = this.loader.gltf.extensions!.KHR_implicit_shapes;
+            let rbExt : KHR_physics_rigid_bodies.SceneExt = this.loader.gltf.extensions!.KHR_physics_rigid_bodies;
             let filter : Nullable<KHR_physics_rigid_bodies.CollisionFilter> = null;
             let material : Nullable<KHR_physics_rigid_bodies.PhysicsMaterial> = null;
             if (extData.collider.collisionFilter != null) {
@@ -426,11 +424,20 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 material = rbExt.physicsMaterials![extData.collider.physicsMaterial];
             }
             this._deferredColliders.push(async () => {
-                let physicsShape = await this._constructPhysicsShape(context, sceneNode, gltfNode, collider, filter, material, assign);
+                let geom = extData.collider!.geometry;
+                let physicsShape : Nullable<PhysicsShape> = null;
+                if (geom.shape != null) {
+                    let shape = shapeExt.shapes[geom.shape];
+                    physicsShape = this._constructPhysicsShape(context, sceneNode, gltfNode, shape, assign);
+                } else if (geom.node != null) {
+                    physicsShape = await this._constructPhysicsMesh(context, sceneNode, gltfNode, geom.node, geom.convexHull ?? false, assign);
+                }
 
                 if (physicsShape == null) {
                     return;
                 }
+
+                this._setShapeFilterMaterial(physicsShape, filter, material);
 
                 let rigidBodyNode = this._getParentRigidBody(sceneNode);
                 if (rigidBodyNode == null) {
@@ -562,10 +569,11 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
             // initialized. Ideally the user would enable physics beforehand, but the
             // FilesInput class can do this when drag-and-dropping a file into a scene
             var gravityVector = new Vector3(0, -9.81 * 1, 0);
-            const hkPlugin = new HavokPlugin(true, KHR_PhysicsRigidBodies_Plugin.s_havokInterface);
+            const hkPlugin = new HavokPlugin(false, KHR_PhysicsRigidBodies_Plugin.s_havokInterface);
             this._babylonScene.enablePhysics(gravityVector, hkPlugin);
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine!.getPluginVersion();
+            new PhysicsViewer(this._babylonScene);
         } else {
             let physicsEngine = this._babylonScene.getPhysicsEngine();
             this._physicsVersion = physicsEngine ? physicsEngine.getPluginVersion() : -1;
