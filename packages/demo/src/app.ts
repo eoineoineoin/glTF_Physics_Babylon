@@ -12,11 +12,13 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { KHR_PhysicsRigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
+import { KHR_PhysicsRigidBodies_Plugin, KHR_ImplicitShapes_Plugin} from "babylon-gltf-rigid-body-loader";
 import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
 const g_havokInterface = await HavokPhysics();
 KHR_PhysicsRigidBodies_Plugin.s_havokInterface = g_havokInterface;
+GLTF2.GLTFLoader.RegisterExtension(
+   "KHR_implicit_shapes", function (loader) { return new KHR_ImplicitShapes_Plugin(loader); } );
 GLTF2.GLTFLoader.RegisterExtension(
    "KHR_physics_rigid_bodies", function (loader) { return new KHR_PhysicsRigidBodies_Plugin(loader); } );
 MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
@@ -218,10 +220,19 @@ class App {
     }
 
     private createDefaultCamera(scene: Scene): FreeCamera {
-        let camera = new FreeCamera("Default Camera", new Vector3(0.1, 1.8, 1.3), scene);
+        var camTo = new Vector3(0,0,0);
+        var camFrom = new Vector3(10,10,10);
+
+        if (scene.getNodes().length > 1 /* 1 Node for skybox */) {
+            var bb = scene.getWorldExtends();
+            camTo = bb.min.add(bb.max.subtract(bb.min).scale(0.5));
+            camFrom = bb.max.add(bb.max.subtract(camTo).scale(1.5));
+        }
+
+        let camera = new FreeCamera("Default Camera", camFrom, scene);
         camera.speed *= 0.1;
         camera.angularSensibility *= 2;
-        camera.setTarget(new Vector3(-0.2, 0.8, -0.3));
+        camera.setTarget(camTo);
         camera.minZ = 0.01;
         camera.maxZ = 100;
         this._defaultCamera = camera;

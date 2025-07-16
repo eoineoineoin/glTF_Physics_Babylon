@@ -20,7 +20,12 @@ In your project, register the extension with Babylon's glTF loader:
 import { GLTF2 } from "@babylonjs/loaders";
 
 // Latest, development plugin; might change in the future, which might break assets!
-import { KHR_PhysicsRigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
+import { KHR_PhysicsRigidBodies_Plugin, KHR_Implicitshapes_Plugin } from "babylon-gltf-rigid-body-loader";
+
+GLTF2.GLTFLoader.RegisterExtension(
+   "KHR_implicit_shapes", function (loader) {
+       return new KHR_Implicitshapes_Plugin(loader);
+   });
 
 GLTF2.GLTFLoader.RegisterExtension(
    "KHR_physics_rigid_bodies", function (loader) {
