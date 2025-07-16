@@ -12,11 +12,13 @@ import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
 import { GLTF2 } from "@babylonjs/loaders";
-import { KHR_PhysicsRigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
+import { KHR_PhysicsRigidBodies_Plugin, KHR_ImplicitShapes_Plugin} from "babylon-gltf-rigid-body-loader";
 import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
 const g_havokInterface = await HavokPhysics();
 KHR_PhysicsRigidBodies_Plugin.s_havokInterface = g_havokInterface;
+GLTF2.GLTFLoader.RegisterExtension(
+   "KHR_implicit_shapes", function (loader) { return new KHR_ImplicitShapes_Plugin(loader); } );
 GLTF2.GLTFLoader.RegisterExtension(
    "KHR_physics_rigid_bodies", function (loader) { return new KHR_PhysicsRigidBodies_Plugin(loader); } );
 MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
