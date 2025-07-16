@@ -15,7 +15,8 @@
   "author": "Eoin Mcloughlin",
   "license": "MIT",
   "peerDependencies": {
-    "@babylonjs/core": "^6.0.0 || ^7.0.0"
+    "@babylonjs/core": "^6.0.0 || ^7.0.0 || ^8.0.0",
+    "@babylonjs/loaders": "^8.0.0"
   },
   "devDependencies": {
     "@rollup/plugin-terser": "^0.4.3",
