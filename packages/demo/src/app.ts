@@ -220,10 +220,19 @@ class App {
     }
 
     private createDefaultCamera(scene: Scene): FreeCamera {
-        let camera = new FreeCamera("Default Camera", new Vector3(0.1, 1.8, 1.3), scene);
+        var camTo = new Vector3(0,0,0);
+        var camFrom = new Vector3(10,10,10);
+
+        if (scene.getNodes().length > 1 /* 1 Node for skybox */) {
+            var bb = scene.getWorldExtends();
+            camTo = bb.min.add(bb.max.subtract(bb.min).scale(0.5));
+            camFrom = bb.max.add(bb.max.subtract(camTo).scale(1.5));
+        }
+
+        let camera = new FreeCamera("Default Camera", camFrom, scene);
         camera.speed *= 0.1;
         camera.angularSensibility *= 2;
-        camera.setTarget(new Vector3(-0.2, 0.8, -0.3));
+        camera.setTarget(camTo);
         camera.minZ = 0.01;
         camera.maxZ = 100;
         this._defaultCamera = camera;
