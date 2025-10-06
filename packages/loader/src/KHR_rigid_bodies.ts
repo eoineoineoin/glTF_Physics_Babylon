@@ -194,20 +194,23 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
         let scene = this.loader.babylonScene;
         let physicsShape: Nullable<PhysicsShape> = null;
         if (shapeData.sphere != undefined) {
-            var sphere = new PhysicsShapeSphere(Vector3.Zero(), shapeData.sphere.radius, scene);
+            var sphere = new PhysicsShapeSphere(Vector3.Zero(), shapeData.sphere.radius ?? 0.5, scene);
             physicsShape = sphere;
         }
         else if (shapeData.box != undefined) {
-            const size = Vector3.FromArray(shapeData.box.size);
+            const size = Vector3.FromArray(shapeData.box.size ?? [1,1,1]);
             var box = new PhysicsShapeBox(Vector3.Zero(), Quaternion.Identity(), size, scene);
             physicsShape = box;
         }
         else if (shapeData.cylinder != undefined) {
-            const pointA = new Vector3(0, 0.5 * shapeData.cylinder.height, 0);
-            const pointB = new Vector3(0, 0.5 * -shapeData.cylinder.height, 0);
+            const height = shapeData.cylinder.height ?? 0.5;
+            const radiusTop = shapeData.cylinder.radiusTop ?? 0.25;
+            const radiusBottom = shapeData.cylinder.radiusBottom ?? 0.25;
+            const pointA = new Vector3(0, 0.5 * height, 0);
+            const pointB = new Vector3(0, 0.5 * -height, 0);
 
-            if (shapeData.cylinder.radiusTop == shapeData.cylinder.radiusBottom) {
-                var cylinder = new PhysicsShapeCylinder(pointA, pointB, shapeData.cylinder.radiusTop, scene);
+            if (radiusTop == radiusBottom) {
+                var cylinder = new PhysicsShapeCylinder(pointA, pointB, radiusTop, scene);
                 physicsShape = cylinder;
             } else {
                 //<todo We're approximating this with a convex hull - should get the physics engine
@@ -219,13 +222,13 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 for(let i = 0; i < numDivisions; i++) {
                     const c = Math.cos(2 * Math.PI * i / (numDivisions - 1));
                     const s = Math.sin(2 * Math.PI * i / (numDivisions - 1));
-                    positions.push(c * shapeData.cylinder.radiusTop);
-                    positions.push(0.5 * shapeData.cylinder.height);
-                    positions.push(s * shapeData.cylinder.radiusTop);
+                    positions.push(c * radiusTop);
+                    positions.push(0.5 * height);
+                    positions.push(s * radiusTop);
 
-                    positions.push(c * shapeData.cylinder.radiusBottom);
-                    positions.push(-0.5 * shapeData.cylinder.height);
-                    positions.push(s * shapeData.cylinder.radiusBottom);
+                    positions.push(c * radiusBottom);
+                    positions.push(-0.5 * height);
+                    positions.push(s * radiusBottom);
                 }
                 var vertexData = new VertexData();
                 vertexData.positions = positions;
@@ -234,19 +237,21 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
             }
         }
         else if (shapeData.capsule != undefined) {
-            const capsuleData = shapeData.capsule;
-            const pointA = new Vector3(0, 0.5 * capsuleData.height, 0);
-            const pointB = new Vector3(0, -0.5 * capsuleData.height, 0);
+            const height = shapeData.capsule.height ?? 0.5;
+            const radiusTop = shapeData.capsule.radiusTop ?? 0.25;
+            const radiusBottom = shapeData.capsule.radiusBottom ?? 0.25;
+            const pointA = new Vector3(0, 0.5 * height, 0);
+            const pointB = new Vector3(0, -0.5 * height, 0);
 
-            if (capsuleData.radiusTop == capsuleData.radiusBottom) {
-                var capsule = new PhysicsShapeCapsule(pointA, pointB, capsuleData.radiusTop, scene);
+            if (radiusTop == radiusBottom) {
+                var capsule = new PhysicsShapeCapsule(pointA, pointB, radiusTop, scene);
                 physicsShape = capsule;
             } else {
                 var templateMesh = MeshBuilder.CreateCapsule("tempCapsule", {
                     capSubdivisions: 64,
-                    radiusTop: capsuleData.radiusTop,
-                    radiusBottom: capsuleData.radiusBottom,
-                    height: capsuleData.height + capsuleData.radiusTop + capsuleData.radiusBottom}, scene);
+                    radiusTop: radiusTop,
+                    radiusBottom: radiusBottom,
+                    height: height + radiusTop + radiusBottom}, scene);
                 physicsShape = new PhysicsShapeConvexHull(templateMesh, scene);
                 templateMesh.dispose();
             }
@@ -316,25 +321,14 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
         filterData : Nullable<KHR_physics_rigid_bodies.CollisionFilter>,
         materialData:  Nullable<KHR_physics_rigid_bodies.PhysicsMaterial>) : PhysicsShape {
         // Add collision filter info
-        if (filterData) {
-            let filterMembership = 0;
-            let filterCollideWith = 0;
-            let hasFilterInfo = false;
+        if (filterData && physicsShape) {
             if (filterData.collisionSystems) {
-                filterMembership = this._layerNamesToMask(filterData.collisionSystems);
-                hasFilterInfo = true;
+                physicsShape.filterMembershipMask = this._layerNamesToMask(filterData.collisionSystems);
             }
             if (filterData.collideWithSystems) {
-                filterCollideWith = this._layerNamesToMask(filterData.collideWithSystems);
-                hasFilterInfo = true;
+                physicsShape.filterCollideMask = this._layerNamesToMask(filterData.collideWithSystems);
             } else if (filterData.notCollideWithSystems) {
-                filterCollideWith = ~this._layerNamesToMask(filterData.notCollideWithSystems);
-                hasFilterInfo = true;
-            }
-
-            if (physicsShape && hasFilterInfo) {
-                physicsShape.filterMembershipMask = filterMembership;
-                physicsShape.filterCollideMask = filterCollideWith;
+                physicsShape.filterCollideMask = ~this._layerNamesToMask(filterData.notCollideWithSystems);
             }
         }
 
@@ -465,19 +459,14 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
                 if (extData.motion.linearVelocity != null) {
                     let lv = Vector3.FromArray(extData.motion.linearVelocity);
-                    if (!sceneNode.getScene().useRightHandedSystem) {
-                        lv.x *= -1;
-                    }
+					lv = Vector3.TransformNormal(lv, sceneNode.getWorldMatrix());
                     sceneNode.physicsBody.setLinearVelocity(lv);
                 }
 
                 if (extData.motion.angularVelocity != null) {
                     let av = Vector3.FromArray(extData.motion.angularVelocity);
-                    if (!sceneNode.getScene().useRightHandedSystem) {
-                        av.y *= -1;
-                        av.z *= -1;
-                    }
-                    sceneNode.physicsBody.setAngularVelocity(av);
+					av = Vector3.TransformNormal(av, sceneNode.getWorldMatrix());
+					sceneNode.physicsBody.setAngularVelocity(av);
                 }
 
                 var massProps : PhysicsMassProperties = {};
