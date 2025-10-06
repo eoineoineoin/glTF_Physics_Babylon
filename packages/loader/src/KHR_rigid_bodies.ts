@@ -459,19 +459,14 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
                 if (extData.motion.linearVelocity != null) {
                     let lv = Vector3.FromArray(extData.motion.linearVelocity);
-                    if (!sceneNode.getScene().useRightHandedSystem) {
-                        lv.x *= -1;
-                    }
+					lv = Vector3.TransformNormal(lv, sceneNode.getWorldMatrix());
                     sceneNode.physicsBody.setLinearVelocity(lv);
                 }
 
                 if (extData.motion.angularVelocity != null) {
                     let av = Vector3.FromArray(extData.motion.angularVelocity);
-                    if (!sceneNode.getScene().useRightHandedSystem) {
-                        av.y *= -1;
-                        av.z *= -1;
-                    }
-                    sceneNode.physicsBody.setAngularVelocity(av);
+					av = Vector3.TransformNormal(av, sceneNode.getWorldMatrix());
+					sceneNode.physicsBody.setAngularVelocity(av);
                 }
 
                 var massProps : PhysicsMassProperties = {};
