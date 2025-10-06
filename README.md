@@ -57,3 +57,13 @@ npm install
 npm run build -w babylon-gltf-rigid-body-loader
 npm run start -w babylon-gltf-rigid-body-loader-demo
 ```
+
+### Demo controls
+
+The demo application has some simple controls hooked up:
+
+* Click and drag to pan the camera
+* W/S/A/D/Q/E to dolly the camera
+* Hover over an object and hold space to grab a physics object
+    * Moving the mouse will apply a force to the object
+    * Object can be reeled in or out using the mouse wheel
