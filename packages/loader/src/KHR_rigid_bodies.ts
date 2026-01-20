@@ -96,7 +96,7 @@ namespace KHR_physics_rigid_bodies
     export class Geometry
     {
         shape? : number;
-        node? : number;
+        mesh? : number;
         convexHull? : boolean;
     }
 
@@ -262,57 +262,23 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
     protected async _constructPhysicsMesh(
         context: string, sceneNode: AbstractMesh, gltfNode: GLTF2.INode,
-        meshNodeIndex: number, convexHull: boolean,
+        meshIndex: number, convexHull: boolean,
         assign: ((babylonMesh: TransformNode) => void)) : Promise<Nullable<PhysicsShape>> {
 
         let scene = this.loader.babylonScene;
-        var nodeData = this.loader.gltf.nodes![meshNodeIndex];
-        //<todo Need to handle the case where the node doesn't have a mesh, but child nodes do.
-        //< However, the PhysicsShape ctor takes a Mesh, rather than a TransformNode
-        var meshData = this.loader.gltf.meshes![nodeData.mesh!];
+        var meshData = this.loader.gltf.meshes![meshIndex];
         //<todo I just want to access the mesh object here; not create one in the scene
         //@ts-ignore _loadMeshAsync is private:
         var meshShape = await this.loader._loadMeshAsync(context.concat("/collider"), gltfNode, meshData, assign) as Mesh;
-        // Create a temp mesh, which our real mesh will be a child of. This will allow
-        // the loader to read the relative transform of the mesh node, without seeing any
-        // meshes associated with the original node which this mesh is attached to.
-        let tn = new Mesh("_temp", scene);
-        meshShape.parent = tn;
-        if (nodeData.matrix != null) {
-            let nodeToMesh = Matrix.FromArray(nodeData.matrix).transpose();
-            let scaling = new Vector3();
-            let rotationQuaternion = new Quaternion();
-            let position = new Vector3();
-            nodeToMesh.decompose(scaling, rotationQuaternion, position);
-            meshShape.position = position;
-            meshShape.rotationQuaternion = rotationQuaternion;
-            meshShape.scaling = scaling;
-        } else {
-            if (nodeData.translation != null) {
-                meshShape.position = Vector3.FromArray(nodeData.translation);
-            } else {
-                meshShape.position = Vector3.Zero();
-            }
-
-            if (nodeData.rotation != null) {
-                meshShape.rotationQuaternion = Quaternion.FromArray(nodeData.rotation); //(nodeData.rotation[1], nodeData.rotation[2], nodeData.rotation[3], nodeData.rotation[0]);
-            } else {
-                meshShape.rotationQuaternion = Quaternion.Identity();
-            }
-
-            if (nodeData.scale != null) {
-                meshShape.scaling = Vector3.FromArray(nodeData.scale);
-            } else {
-                meshShape.scaling = Vector3.One();
-            }
-        }
-
+        meshShape.parent = null;
+        meshShape.position = Vector3.Zero();
+        meshShape.rotationQuaternion = Quaternion.Identity();
+        meshShape.scaling = Vector3.One();
         let shapeType = convexHull ? PhysicsShapeType.CONVEX_HULL : PhysicsShapeType.MESH;
-        let physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: tn, includeChildMeshes: true }}, scene);
+        let physicsShape = new PhysicsShape({ type: shapeType, parameters: { mesh: meshShape, includeChildMeshes: true }}, scene);
         // Defer disposal of this mesh until later; we can't do it now,
         // as the same mesh could be used by multiple shape instances.
         this._meshesToDispose.push(meshShape);
-        this._meshesToDispose.push(tn);
         return physicsShape;
     }
 
@@ -398,8 +364,8 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
                 if (geom.shape != null) {
                     let shape = shapeExt.shapes[geom.shape];
                     physicsShape = this._constructPhysicsShape(context, sceneNode, gltfNode, shape, assign);
-                } else if (geom.node != null) {
-                    physicsShape = await this._constructPhysicsMesh(context, sceneNode, gltfNode, geom.node, geom.convexHull ?? false, assign);
+                } else if (geom.mesh != null) {
+                    physicsShape = await this._constructPhysicsMesh(context, sceneNode, gltfNode, geom.mesh, geom.convexHull ?? false, assign);
                 }
 
                 if (physicsShape == null) {
@@ -459,14 +425,17 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
                 if (extData.motion.linearVelocity != null) {
                     let lv = Vector3.FromArray(extData.motion.linearVelocity);
-					lv = Vector3.TransformNormal(lv, sceneNode.getWorldMatrix());
+                    lv = Vector3.TransformNormal(lv, sceneNode.getWorldMatrix());
                     sceneNode.physicsBody.setLinearVelocity(lv);
                 }
 
                 if (extData.motion.angularVelocity != null) {
                     let av = Vector3.FromArray(extData.motion.angularVelocity);
-					av = Vector3.TransformNormal(av, sceneNode.getWorldMatrix());
-					sceneNode.physicsBody.setAngularVelocity(av);
+                    av = Vector3.TransformNormal(av, sceneNode.getWorldMatrix());
+                    if (!this._babylonScene.useRightHandedSystem) {
+                        av.scaleInPlace(-1.0);
+                    }
+                    sceneNode.physicsBody.setAngularVelocity(av);
                 }
 
                 var massProps : PhysicsMassProperties = {};
@@ -567,6 +536,7 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
         // Get transform from parent RB
         let rbA = this._getParentRigidBody(joint.pivotA!)!;
         let rbB = this._getParentRigidBody(joint.pivotB ?? null);
+        let scene = this.loader.babylonScene;
 
         rbA.computeWorldMatrix(true);
         let rbAToWorld = Matrix.Compose(Vector3.One(), rbA.absoluteRotationQuaternion, rbA.absolutePosition);
@@ -581,8 +551,21 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
         if (rbB) {
             rbB.computeWorldMatrix(true);
+        } else {
+            // This is a constraint attached to something other than a dynamic rigid body.
+            // Plugin interface requires an additional body to create a constraint, so
+            // make a temporary one (//<todo Make plugin interface allow this!)
+            rbB = joint.pivotB ?? new TransformNode("__jointBody");
+            if (joint.pivotB == null) {
+                rbB.position = joint.pivotA!.absolutePosition;
+                rbB.rotationQuaternion = joint.pivotA!.absoluteRotationQuaternion;
+                rbB.scaling = joint.pivotA!.absoluteScaling;
+            }
+
+            rbB.physicsBody = new PhysicsBody(rbB, PhysicsMotionType.STATIC, false, scene);
         }
-        let rbBToWorld = Matrix.Compose(Vector3.One(), (rbB ?? rbA).absoluteRotationQuaternion, (rbB ?? rbA).absolutePosition);
+
+        let rbBToWorld = Matrix.Compose(Vector3.One(), rbB.absoluteRotationQuaternion, rbB.absolutePosition);
 
         if (joint.pivotB) {
             joint.pivotB.computeWorldMatrix(true);
@@ -601,7 +584,7 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
         // Special handling of constraint basis when Babylon is in left-handed mode. This is a little
         // bit hacky; might need to calculate this properly, in case the scene nodes contain
         // mirrored nodes. todo: validate when this can cause a problem
-        const isLeftHanded = !joint.pivotA!.getScene().useRightHandedSystem;
+        const isLeftHanded = !scene.useRightHandedSystem;
 
         let jointDesc = sceneExt.physicsJoints![joint.jointInfo!.joint];
         const nativeLimits: Physics6DoFLimit[] = []
@@ -652,13 +635,12 @@ export class KHR_PhysicsRigidBodies_Plugin implements IGLTFLoaderExtension  {
 
         let constraintInstance = new Physics6DoFConstraint( {
             pivotA: pivotTranslationInA, pivotB: pivotTranslationInB,
-            axisA: axisA, axisB: axisB, perpAxisA: perpAxisA, perpAxisB: perpAxisB}, nativeLimits, this.loader.babylonScene);
-        //<todo addConstraint() should allow for a null body
-        rbA.physicsBody!.addConstraint(rbB!.physicsBody!, constraintInstance);
+            axisA: axisA, axisB: axisB, perpAxisA: perpAxisA, perpAxisB: perpAxisB}, nativeLimits, scene);
+        rbA.physicsBody!.addConstraint(rbB.physicsBody!, constraintInstance);
         constraintInstance.isCollisionsEnabled = !!joint.jointInfo!.enableCollision;
 
         //<todo Temp setup for motors; convert to real Babylon API once exposed
-        let hp = this.loader.babylonScene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
+        let hp = scene.getPhysicsEngine()?.getPhysicsPlugin() as HavokPlugin;
         let wasm = hp._hknp;
         if (jointDesc.drives) {
             for (const d of jointDesc.drives) {

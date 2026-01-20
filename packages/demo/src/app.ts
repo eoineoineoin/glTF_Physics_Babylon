@@ -1,9 +1,10 @@
 import "@babylonjs/core/Debug/debugLayer";
 import { Vector3 } from "@babylonjs/core";
-import { Engine, Scene, SceneLoader, FreeCamera, TransformNode } from "@babylonjs/core";
+import { Engine, Scene, FreeCamera, TransformNode } from "@babylonjs/core";
 import { ShadowGenerator, IShadowLight } from "@babylonjs/core";
 import { Observable, PointerEventTypes } from "@babylonjs/core";
 import { FilesInput } from "@babylonjs/core";
+import { ImportMeshAsync } from "@babylonjs/core";
 
 import HavokPhysics from "@babylonjs/havok";
 import { PhysicsBody, PhysicsMotionType, HavokPlugin } from "@babylonjs/core";
@@ -11,19 +12,16 @@ import { PhysicsBody, PhysicsMotionType, HavokPlugin } from "@babylonjs/core";
 import { KeyboardEventTypes } from "@babylonjs/core";
 
 import "@babylonjs/loaders/glTF";
-import { GLTF2 } from "@babylonjs/loaders";
+import { registerGLTFExtension } from "@babylonjs/loaders/glTF/2.0/glTFLoaderExtensionRegistry";
 import { KHR_PhysicsRigidBodies_Plugin, KHR_ImplicitShapes_Plugin} from "babylon-gltf-rigid-body-loader";
 import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
 const g_havokInterface = await HavokPhysics();
 KHR_PhysicsRigidBodies_Plugin.s_havokInterface = g_havokInterface;
-GLTF2.GLTFLoader.RegisterExtension(
-   "KHR_implicit_shapes", function (loader) { return new KHR_ImplicitShapes_Plugin(loader); } );
-GLTF2.GLTFLoader.RegisterExtension(
-   "KHR_physics_rigid_bodies", function (loader) { return new KHR_PhysicsRigidBodies_Plugin(loader); } );
+registerGLTFExtension("KHR_implicit_shapes", true, (loader) => new KHR_ImplicitShapes_Plugin(loader));
+registerGLTFExtension("KHR_physics_rigid_bodies", true, (loader) => new KHR_PhysicsRigidBodies_Plugin(loader));
 MSFT_RigidBodies_Plugin.s_havokInterface = g_havokInterface;
-GLTF2.GLTFLoader.RegisterExtension(
-   "MSFT_rigid_bodies", function (loader) { return new MSFT_RigidBodies_Plugin(loader); } );
+registerGLTFExtension("MSFT_rigid_bodies", true, (loader) => new MSFT_RigidBodies_Plugin(loader));
 
 import { PhysicsMouseSpring } from './physicsUtils';
 import { CubeTexture } from "@babylonjs/core";
@@ -99,7 +97,7 @@ class App {
     private async loadSceneUrl(url: string) {
         let scene = this.setupEmptyScene();
         await this.setupPhysics(scene);
-        await SceneLoader.ImportMeshAsync("", url, "", scene);
+        await ImportMeshAsync(url, scene);
 
         this.setupCameraSelection(scene);
         this.setupShadows(scene);
@@ -108,7 +106,7 @@ class App {
     private setupSceneSelection(sceneInfos: SceneInfo[]) {
         let ul = document.createElement("ul");
         let selectedSceneIndex = 0;
-        
+
         let params = this.locationHashParams();
         if ("sceneIndex" in params) {
             selectedSceneIndex = +params["sceneIndex"];

@@ -17,29 +17,21 @@ npm install babylon-gltf-rigid-body-loader
 In your project, register the extension with Babylon's glTF loader:
 
 ```
-import { GLTF2 } from "@babylonjs/loaders";
+import { registerGLTFExtension } from "@babylonjs/loaders/glTF/2.0/glTFLoaderExtensionRegistry";
 
 // Latest, development plugin; might change in the future, which might break assets!
 import { KHR_PhysicsRigidBodies_Plugin, KHR_Implicitshapes_Plugin } from "babylon-gltf-rigid-body-loader";
 
-GLTF2.GLTFLoader.RegisterExtension(
-   "KHR_implicit_shapes", function (loader) {
-       return new KHR_Implicitshapes_Plugin(loader);
-   });
-
-GLTF2.GLTFLoader.RegisterExtension(
-   "KHR_physics_rigid_bodies", function (loader) {
-       return new KHR_PhysicsRigidBodies_Plugin(loader);
-   });
-
+registerGLTFExtension("KHR_implicit_shapes", true,
+    (loader) => new KHR_ImplicitShapes_Plugin(loader));
+registerGLTFExtension("KHR_physics_rigid_bodies", true,
+    (loader) => new KHR_PhysicsRigidBodies_Plugin(loader));
 
 // Stable, feature-frozen plugin; won't make any breaking changes to assets:
 import { MSFT_RigidBodies_Plugin } from "babylon-gltf-rigid-body-loader";
 
-GLTF2.GLTFLoader.RegisterExtension(
-   "MSFT_rigid_bodies", function (loader) {
-       return new MSFT_RigidBodies_Plugin(loader);
-   });
+registerGLTFExtension("MSFT_rigid_bodies", true,
+    (loader) => new MSFT_RigidBodies_Plugin(loader));
 ```
 
 Ensure that you've called `scene.enablePhysics()` on your scene before loading any assets containing physics information.
